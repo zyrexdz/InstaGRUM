@@ -261,7 +261,7 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        GalleryButton(selectedKind, ::select)
+                        GalleryButton(selectedKind, ::select, mixed = !live)
                         Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
                             if (story && recording) CircularProgressIndicator(
                                 progress = { recordProgress },
