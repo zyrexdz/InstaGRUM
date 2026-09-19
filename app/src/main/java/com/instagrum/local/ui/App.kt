@@ -119,14 +119,15 @@ private fun AccountSwitcher(state: AppState, onAction: (Action) -> Unit, dismiss
 
 @Composable
 private fun ProfileStat(value: Long, label: String, modifier: Modifier = Modifier) {
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedNumber(value, size = 15.sp, uppercase = true)
+    Column(modifier, horizontalAlignment = Alignment.Start) {
+        AnimatedNumber(value, size = 16.sp, uppercase = true)
+        Spacer(Modifier.height(2.dp))
         Text(
             label,
-            fontSize = 13.sp,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1,
-            modifier = Modifier.padding(top = 1.dp)
+            fontSize = 14.sp,
+            fontWeight = FontWeight.Normal,
+            color = MaterialTheme.colorScheme.onBackground,
+            maxLines = 1
         )
     }
 }
@@ -233,13 +234,16 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                     Modifier.size(25.dp).clickable { onAction(Action.Navigate("settings")) })
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(88.dp)) {
+                        Spacer(Modifier.height(10.dp))
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(Modifier.size(80.dp)) {
                                 Box(
                                     Modifier.fillMaxSize()
                                         .storyRing(unseenStories, 2.5.dp)
-                                        .padding(5.dp)
+                                        .padding(3.dp)
                                         .clickable {
                                             activeStories.firstOrNull { !it.seen }
                                                 ?.let { onAction(Action.OpenStory(it.id)) }
@@ -249,28 +253,47 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                         }
                                 ) { AvatarFromProfile(profile, Modifier.fillMaxSize()) }
                                 Box(
-                                    Modifier.align(Alignment.BottomEnd).size(24.dp).clip(CircleShape)
-                                        .background(MaterialTheme.colorScheme.background).padding(2.dp)
-                                        .clip(CircleShape).background(ActionBlue)
+                                    Modifier
+                                        .align(Alignment.BottomEnd)
+                                        .size(22.dp)
+                                        .clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.background)
+                                        .padding(1.5.dp)
+                                        .clip(CircleShape)
+                                        .background(Color.White)
                                         .clickable { onAction(Action.Navigate("create")) },
                                     contentAlignment = Alignment.Center
-                                ) { Icon(Icons.Default.Add, "Add", Modifier.size(15.dp), tint = Color.White) }
+                                ) { Icon(Icons.Default.Add, "Add", Modifier.size(13.dp), tint = Color.Black) }
                             }
-                            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                ProfileStat(state.posts.size.toLong(), "posts", Modifier)
-                                ProfileStat(
-                                    profile.followers,
-                                    "followers",
-                                    Modifier.clickable { peopleSheet = "Followers" })
-                                ProfileStat(state.posts.sumOf { it.likes }, "likes", Modifier)
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 24.dp, end = 6.dp)
+                            ) {
+                                Text(
+                                    profile.displayName.ifBlank { profile.username },
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                Spacer(Modifier.height(12.dp))
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    ProfileStat(state.posts.size.toLong(), "posts")
+                                    ProfileStat(
+                                        profile.followers,
+                                        "followers",
+                                        Modifier.clickable { peopleSheet = "Followers" })
+                                    ProfileStat(
+                                        profile.following,
+                                        "following",
+                                        Modifier.clickable { peopleSheet = "Following" })
+                                }
                             }
                         }
-                        Text(
-                            profile.displayName,
-                            fontSize = 15.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 8.dp)
-                        )
                         if (profile.bio.isNotBlank()) Text(
                             profile.bio,
                             fontSize = 14.sp,
