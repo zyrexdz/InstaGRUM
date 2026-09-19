@@ -10,8 +10,6 @@
         <include domain="file" path="accounts" />
         <include domain="file" path="media" />
         <include domain="sharedpref" path="local_accounts.xml" />
-        <exclude domain="sharedpref" path="notification_delivery.xml" />
-        <exclude domain="sharedpref" path="permissions.xml" />
     </cloud-backup>
     <device-transfer>
         <include domain="file" path="accounts" />

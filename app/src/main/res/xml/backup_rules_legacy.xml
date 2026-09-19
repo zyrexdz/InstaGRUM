@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Legacy backup descriptor for Android 11 and older. -->
+<!-- Legacy backup descriptor for Android 11 and older. Listing includes means
+     everything else, such as transient notification state, is already excluded. -->
 <full-backup-content>
     <include domain="file" path="accounts" />
     <include domain="file" path="media" />
     <include domain="sharedpref" path="local_accounts.xml" />
-    <exclude domain="sharedpref" path="notification_delivery.xml" />
-    <exclude domain="sharedpref" path="permissions.xml" />
 </full-backup-content>
