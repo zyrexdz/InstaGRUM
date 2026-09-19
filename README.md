@@ -58,7 +58,7 @@ Sampled from actual runs, not targets written into the code:
 
 ## Install
 
-Grab `app-release.apk` from [Releases](https://github.com/zyrexdz/InstaGRUM/releases) and open it on your phone. You'll need to allow installs from unknown sources when it asks.
+Grab `instagrum.apk` from [Releases](https://github.com/zyrexdz/InstaGRUM/releases) and open it on your phone. You'll need to allow installs from unknown sources when it asks.
 
 Needs Android 8.0 or newer.
 
