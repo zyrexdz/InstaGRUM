@@ -256,23 +256,21 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                     contentAlignment = Alignment.Center
                                 ) { Icon(Icons.Default.Add, "Add", Modifier.size(15.dp), tint = Color.White) }
                             }
-                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
-                                Text(
-                                    profile.displayName,
-                                    fontSize = 15.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 12.dp)
-                                )
-                                Row(Modifier.fillMaxWidth()) {
-                                    ProfileStat(state.posts.size.toLong(), "posts", Modifier.weight(1f))
-                                    ProfileStat(
-                                        profile.followers,
-                                        "followers",
-                                        Modifier.weight(1f).clickable { peopleSheet = "Followers" })
-                                    ProfileStat(state.posts.sumOf { it.likes }, "likes", Modifier.weight(1f))
-                                }
+                            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                ProfileStat(state.posts.size.toLong(), "posts", Modifier)
+                                ProfileStat(
+                                    profile.followers,
+                                    "followers",
+                                    Modifier.clickable { peopleSheet = "Followers" })
+                                ProfileStat(state.posts.sumOf { it.likes }, "likes", Modifier)
                             }
                         }
+                        Text(
+                            profile.displayName,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
                         if (profile.bio.isNotBlank()) Text(
                             profile.bio,
                             fontSize = 14.sp,
