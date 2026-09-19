@@ -1,6 +1,7 @@
 package com.instagrum.local.simulation
 
 import com.instagrum.local.data.InitialState
+import com.instagrum.local.data.StateReducer
 import com.instagrum.local.model.*
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -220,6 +221,63 @@ class SimulationEngineTest {
         val two = CommentGenerator.generate(2, now, "2", recentTexts = listOf(one.text))
         assertNotEquals(one.text, two.text)
         assertTrue(CommentGenerator.pool.size > 200)
+    }
+
+    @Test
+    fun storiesReachTheFollowerNetworkAtEveryAccountSize() {
+        // Regression: a 300-follower account used to get zero story views because
+        // reach was capped by the preset's hourly story budget.
+        val small = run(
+            withContent(owned(GrowthPreset.NORMAL).copy(profile = Profile("me", "Me", followers = 300L)))
+                .copy(posts = emptyList()),
+            3600.0
+        )
+        assertTrue("300 followers must produce story views", small.stories.single().views > 0)
+
+        val large = run(
+            withContent(owned(GrowthPreset.NORMAL).copy(profile = Profile("me", "Me", followers = 1_000_000L)))
+                .copy(posts = emptyList()),
+            3600.0
+        )
+        assertTrue(
+            "story reach must scale with the audience",
+            large.stories.single().views > small.stories.single().views * 50
+        )
+        assertTrue(
+            "insights must count every viewer",
+            large.stories.single().insights.impressions >= large.stories.single().views
+        )
+    }
+
+    @Test
+    fun liveAudienceScalesWithFollowersAndPace() {
+        fun peak(followers: Long, preset: GrowthPreset): Int {
+            var live = LiveSession("live-$followers-$preset", LiveConfig(durationMinutes = 60), now)
+            val settings = GrowthPresets.settings(preset)
+            repeat(900) {
+                live = LivestreamEngine.step(live, 1.0, settings, now + it * 1000L, accountFollowers = followers)
+            }
+            return live.peakViewers
+        }
+
+        val smallRoom = peak(1_000L, GrowthPreset.NORMAL)
+        val bigRoom = peak(1_000_000L, GrowthPreset.NORMAL)
+        val hugeRoom = peak(10_000_000L, GrowthPreset.NORMAL)
+        assertTrue("a million followers should fill a large room ($bigRoom)", bigRoom > smallRoom * 50)
+        assertTrue("ten million should go far beyond that ($hugeRoom)", hugeRoom > bigRoom * 5)
+        assertTrue("celebrity pace must outdraw natural pace", peak(1_000_000L, GrowthPreset.CELEBRITY) > bigRoom * 3)
+    }
+
+    @Test
+    fun changingPaceAppliesToContentThatAlreadyExists() {
+        val seeded = run(withContent(owned(GrowthPreset.SLOW)), 600.0)
+        val switched = StateReducer.reduce(seeded, Action.ChooseGrowth(GrowthPreset.CELEBRITY), now, "pace")
+        assertTrue("stale hazard clocks must be cleared", switched.engine.clocks.isEmpty())
+        assertEquals(GrowthPreset.CELEBRITY, switched.settings.preset)
+
+        val before = run(seeded, 300.0).posts.single().views - seeded.posts.single().views
+        val after = run(switched, 300.0).posts.single().views - switched.posts.single().views
+        assertTrue("an existing post must speed up after a pace change ($before -> $after)", after > before * 10)
     }
 
     @Test

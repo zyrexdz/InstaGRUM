@@ -50,7 +50,19 @@ object StateReducer {
 
             is Action.ChooseGrowth -> s.copy(
                 settings = GrowthPresets.settings(action.preset, s.settings),
-                engine = s.engine.copy(clocks = emptyMap(), pending = emptyList(), phaseUntil = 0.0)
+                // Clearing the hazard clocks and viral waves makes every existing
+                // post, story and live adopt the new pace immediately instead of
+                // finishing at the pace they were created under.
+                engine = s.engine.copy(
+                    clocks = emptyMap(),
+                    pending = emptyList(),
+                    phaseUntil = 0.0,
+                    events = emptyList(),
+                    eventCooldown = 0.0,
+                    ambientMultiplier = 1.0,
+                    ambientUntil = 0.0
+                ),
+                activeLive = s.activeLive?.copy(carry = emptyMap(), phaseUntil = 0.0)
             )
 
             is Action.OpenActivity -> {

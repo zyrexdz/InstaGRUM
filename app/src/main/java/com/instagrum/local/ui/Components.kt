@@ -295,3 +295,7 @@ fun formatTime(timestamp: Long): String = ((System.currentTimeMillis() - timesta
         it < 60_000 -> "now"; it < 3_600_000 -> "${it / 60_000}m"; it < 86_400_000 -> "${it / 3_600_000}h"; else -> "${it / 86_400_000}d"
     }
 }
+
+/** Absolute date, as Instagram shows beneath an older post. */
+fun formatDate(timestamp: Long): String =
+    java.text.SimpleDateFormat("MMMM d, yyyy", Locale.US).format(java.util.Date(timestamp))

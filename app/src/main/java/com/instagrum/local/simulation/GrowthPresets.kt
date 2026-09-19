@@ -12,7 +12,8 @@ object GrowthPresets {
         GrowthPreset.MEDIUM,
         GrowthPreset.FAST,
         GrowthPreset.VIRAL,
-        GrowthPreset.EXTREME
+        GrowthPreset.EXTREME,
+        GrowthPreset.CELEBRITY
     )
 
     fun label(preset: GrowthPreset): String = when (preset) {
@@ -24,6 +25,7 @@ object GrowthPresets {
         GrowthPreset.FAST -> "Fast"
         GrowthPreset.VIRAL -> "Viral"
         GrowthPreset.EXTREME -> "Breakout"
+        GrowthPreset.CELEBRITY -> "Celebrity"
     }
 
     fun description(preset: GrowthPreset): String = when (preset) {
@@ -35,6 +37,7 @@ object GrowthPresets {
         GrowthPreset.FAST -> "More people finding you, with busier moments and lulls."
         GrowthPreset.VIRAL -> "Waves of discovery, without making every post a hit."
         GrowthPreset.EXTREME -> "A big audience finding you. Surges still rise and fade."
+        GrowthPreset.CELEBRITY -> "Household-name reach. Enormous, immediate, and still uneven."
     }
 
     fun factor(preset: GrowthPreset) = when (preset) {
@@ -46,6 +49,7 @@ object GrowthPresets {
         GrowthPreset.FAST -> 7.0
         GrowthPreset.VIRAL -> 24.0
         GrowthPreset.EXTREME -> 65.0
+        GrowthPreset.CELEBRITY -> 260.0
     }
 
     fun profile(preset: GrowthPreset): GrowthProfile = when (preset) {
@@ -60,6 +64,7 @@ object GrowthPresets {
         GrowthPreset.FAST -> GrowthProfile(2.5, 0.0, 0.0, 1_800.0, 4_000.0, 15_000.0, 0.0)
         GrowthPreset.VIRAL -> GrowthProfile(7.0, 0.0, 0.0, 5_000.0, 480_000.0, 1_400_000.0, 0.0)
         GrowthPreset.EXTREME -> GrowthProfile(18.0, 0.0, 0.0, 16_000.0, 1_400_000.0, 4_500_000.0, 0.0)
+        GrowthPreset.CELEBRITY -> GrowthProfile(60.0, 0.0, 0.0, 120_000.0, 9_000_000.0, 28_000_000.0, 0.0)
     }
 
     fun settings(preset: GrowthPreset, current: SimulationSettings = SimulationSettings()) = current.copy(
@@ -78,11 +83,13 @@ object GrowthPresets {
                 GrowthPreset.FAST -> .008
                 GrowthPreset.VIRAL -> .012
                 GrowthPreset.EXTREME -> .018
+                GrowthPreset.CELEBRITY -> .025
             }
         ),
         viralProbabilityPerHour = when (preset) {
             GrowthPreset.VIRAL -> .35
             GrowthPreset.EXTREME -> .65
+            GrowthPreset.CELEBRITY -> 1.1
             GrowthPreset.FAST -> .10
             else -> .004 * factor(preset)
         },

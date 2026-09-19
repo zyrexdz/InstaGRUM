@@ -213,19 +213,19 @@ object SimulationEngine {
             val age = (elapsed - story.publishedAtSimulation).coerceAtLeast(0.0)
             val attention = if (age < 12) 0.0 else (1 - exp(-(age - 12) / 180)) * (1 + age / 3600).pow(-1.3)
             val wave = if (storySurgeUntil > elapsed) 1 + 3 * ((storySurgeUntil - elapsed) / 600) else 1.0
-            // Stories stay inside the follower network. A brand-new account has
-            // nobody to show them to, while a larger account gets a realistic
-            // fraction of followers rather than an arbitrary global audience.
-            val storyAudience = if (followerCount <= 0.0) 0.0 else (
-                    followerCount * (.08 + sqrt(GrowthPresets.factor(settings.preset)) * .018)
-                    ).coerceAtMost(g.storyViewsPerHour.coerceAtLeast(0.0))
+            // Stories stay inside the follower network, but a real account shows
+            // a story to a large share of its followers within the first hours.
+            // Pace changes how fast they arrive, never whether they exist.
+            val storyAudience = if (followerCount <= 0.0) 0.0 else
+                followerCount * (.55 + sqrt(GrowthPresets.factor(settings.preset)) * .35)
             val count =
-                timing.events("story:${story.id}", storyAudience * traffic * attention * wave).toLong()
+                timing.events("story:${story.id}", storyAudience * traffic * attention * wave, 2_000_000).toLong()
                     .coerceAtMost(story.targetViews - story.views).toInt()
+            val namedStoryViews = count.coerceAtMost(40)
             var sample = story.viewers
             var insights = story.insights
             val reactions = story.reactionCounts.toMutableMap()
-            repeat(count) {
+            repeat(namedStoryViews) {
                 var actor = person()
                 if (sample.any { it.person.id == actor.id }) actor = CommentGenerator.person(nextActor++ + 10000)
                 val reaction = if (rng.next() < .07) listOf("❤️", "🔥", "😍", "👏")[rng.int(4)] else ""
@@ -254,6 +254,35 @@ object SimulationEngine {
                     text = reaction
                 )
                 if (rng.next() < .008) schedule(InteractionKind.STORY_REPLY, actor, storyId = story.id)
+            }
+            // Viewers beyond the named sample still count toward the totals, so a
+            // large account sees realistic insights without storing every person.
+            val anonymousStoryViews = (count - namedStoryViews).coerceAtLeast(0)
+            if (anonymousStoryViews > 0) {
+                val bulkReactions = timing.events("story-react:${story.id}", anonymousStoryViews * .07, 500_000)
+                if (bulkReactions > 0) {
+                    val emoji = listOf("❤️", "🔥", "😍", "👏")[rng.int(4)]
+                    reactions[emoji] = (reactions[emoji] ?: 0L) + bulkReactions
+                }
+                val bulkProfileVisits = timing.events("story-visit:${story.id}", anonymousStoryViews * .014, 500_000)
+                visits = visits.plusStat(bulkProfileVisits.toLong())
+                insights = insights.copy(
+                    impressions = insights.impressions + anonymousStoryViews,
+                    likes = insights.likes + bulkReactions,
+                    forward = insights.forward + (anonymousStoryViews * .62).toLong(),
+                    exited = insights.exited + (anonymousStoryViews * .15).toLong(),
+                    nextStory = insights.nextStory + (anonymousStoryViews * .15).toLong(),
+                    back = insights.back + (anonymousStoryViews * .08).toLong(),
+                    profileVisits = insights.profileVisits + bulkProfileVisits,
+                    shares = insights.shares + timing.events(
+                        "story-share:${story.id}",
+                        anonymousStoryViews * .009,
+                        500_000
+                    ),
+                    stickerTaps = insights.stickerTaps +
+                            if (story.overlay.sticker.isBlank()) 0
+                            else timing.events("story-sticker:${story.id}", anonymousStoryViews * .035, 500_000)
+                )
             }
             story.copy(
                 views = story.views.plusStat(count.toLong()),

@@ -87,7 +87,7 @@ data class Story(
 )
 
 @Serializable
-enum class GrowthPreset { DEAD, VERY_SLOW, SLOW, NORMAL, MEDIUM, FAST, VIRAL, EXTREME, CUSTOM }
+enum class GrowthPreset { DEAD, VERY_SLOW, SLOW, NORMAL, MEDIUM, FAST, VIRAL, EXTREME, CELEBRITY, CUSTOM }
 
 @Serializable
 data class GrowthProfile(
@@ -169,7 +169,7 @@ data class LiveConfig(
     val thumbnail: Media = Media(artwork = 4),
     val startingViewers: Int = 0,
     val minViewers: Int = 0,
-    val maxViewers: Int = 5000,
+    val maxViewers: Int = 50_000_000,
     val growthPerMinute: Double = 65.0,
     val declinePerMinute: Double = 35.0,
     val commentsPerMinute: Double = 35.0,

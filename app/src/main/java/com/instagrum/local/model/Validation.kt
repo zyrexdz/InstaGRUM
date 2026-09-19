@@ -27,8 +27,8 @@ fun SimulationSettings.validated(): SimulationSettings = copy(
 )
 
 fun LiveConfig.validated(): LiveConfig {
-    val low = minViewers.coerceIn(0, 10_000_000)
-    val high = maxViewers.coerceIn(low, 10_000_000)
+    val low = minViewers.coerceIn(0, 50_000_000)
+    val high = maxViewers.coerceIn(low, 50_000_000)
     return copy(
         title = title.trim().take(100).ifBlank { "Let's catch up" },
         startingViewers = startingViewers.coerceIn(low, high),

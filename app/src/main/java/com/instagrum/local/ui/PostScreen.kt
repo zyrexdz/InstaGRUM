@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -50,7 +51,7 @@ fun PostDetail(state: AppState, postId: String, onAction: (Action) -> Unit) {
     val current = state.posts.getOrNull(pagerState.currentPage) ?: state.posts[start]
     Scaffold(topBar = {
         ScreenHeader(
-            if (current.media.kind == MediaKind.REEL) "Reel" else "Post",
+            if (current.media.kind == MediaKind.REEL) "Reels" else "Posts",
             { onAction(Action.OpenPost(null)) })
     }) { padding ->
         VerticalPager(
@@ -68,6 +69,7 @@ private fun PostPage(state: AppState, post: Post, active: Boolean, onAction: (Ac
     var comments by rememberSaveable(post.id) { mutableStateOf(false) }
     var controls by rememberSaveable(post.id) { mutableStateOf(false) }
     var fullScreen by rememberSaveable(post.id) { mutableStateOf(false) }
+    var insights by rememberSaveable(post.id) { mutableStateOf(false) }
     var heart by remember(post.id) { mutableIntStateOf(0) }
     var showHeart by remember(post.id) { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
@@ -123,51 +125,134 @@ private fun PostPage(state: AppState, post: Post, active: Boolean, onAction: (Ac
                     )
                 }
             }
-            Row(Modifier.padding(horizontal = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = like) {
-                    Icon(
+            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "View insights",
+                    fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.clickable { insights = true }
+                )
+                HorizontalDivider(thickness = .5.dp)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    CountAction(
                         if (post.liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         "Like post",
-                        tint = if (post.liked) HeartColor else LocalContentColor.current
+                        post.likes,
+                        if (post.liked) HeartColor else LocalContentColor.current,
+                        like
                     )
-                }
-                IconButton(onClick = { comments = true }) { Icon(Icons.Default.ChatBubbleOutline, "Open comments") }
-                IconButton(onClick = { controls = true }) { Icon(Icons.Default.MoreHoriz, "Post options") }
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { onAction(Action.SavePost(post.id)) }) {
+                    Spacer(Modifier.width(18.dp))
+                    CountAction(
+                        Icons.Default.ChatBubbleOutline,
+                        "Open comments",
+                        post.commentCount,
+                        LocalContentColor.current
+                    ) { comments = true }
+                    Spacer(Modifier.width(18.dp))
+                    CountAction(
+                        Icons.Default.Repeat,
+                        "Shares",
+                        post.views / 400,
+                        LocalContentColor.current
+                    ) { insights = true }
+                    Spacer(Modifier.width(18.dp))
+                    Icon(
+                        Icons.AutoMirrored.Filled.Send,
+                        "Send post",
+                        Modifier.size(25.dp).clickable { insights = true })
+                    Spacer(Modifier.weight(1f))
                     Icon(
                         if (post.saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        "Save post"
-                    )
+                        "Save post",
+                        Modifier.size(25.dp).clickable { onAction(Action.SavePost(post.id)) })
                 }
-            }
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                Text("${formatCount(post.likes)} likes", fontWeight = FontWeight.Bold)
-                Text("${state.profile.username}  ${post.caption}")
+                if (post.likes > 0) LikedByRow(post)
+                if (post.caption.isNotBlank()) Text("${state.profile.username}  ${post.caption}")
                 Text(
-                    "View all ${formatCount(post.commentCount)} comments",
-                    modifier = Modifier.clickable { comments = true },
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    "${formatCount(post.views)} views · ${formatTime(post.createdAt)}",
-                    style = MaterialTheme.typography.labelSmall,
+                    formatDate(post.createdAt),
+                    style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (state.engine.events.any { it.postId == post.id }) SmallPill("Your post is taking off ✨")
                 if (post.frozen) SmallPill("Statistics frozen")
-                OutlinedTextField(
-                    "",
-                    {},
-                    Modifier.fillMaxWidth().clickable { comments = true },
-                    enabled = false,
-                    placeholder = { Text("Add a comment…") })
             }
         }
     }
     if (comments) CommentsSheet(state, post, onAction) { comments = false }
     if (controls) PostControls(post, onAction) { controls = false }
     if (fullScreen) FullScreenMedia(post.media) { fullScreen = false }
+    if (insights) PostInsightsSheet(post) { insights = false }
+}
+
+@Composable
+private fun CountAction(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    description: String,
+    count: Long,
+    tint: Color,
+    onClick: () -> Unit,
+) {
+    Row(
+        Modifier.clickable(onClick = onClick),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(icon, description, Modifier.size(25.dp), tint = tint)
+        if (count > 0) Text(
+            "  ${formatCount(count)}",
+            fontWeight = FontWeight.SemiBold,
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+/** Overlapping portraits of recent likers, as Instagram shows under a post. */
+@Composable
+private fun LikedByRow(post: Post) {
+    val faces = post.sampledLikers.take(3)
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        if (faces.isNotEmpty()) {
+            Box(Modifier.width((18 * (faces.size - 1) + 26).dp).height(26.dp)) {
+                faces.forEachIndexed { index, person ->
+                    Avatar(
+                        person,
+                        Modifier.size(26.dp).offset(x = (index * 18).dp)
+                            .border(1.5.dp, MaterialTheme.colorScheme.background, CircleShape)
+                    )
+                }
+            }
+            Spacer(Modifier.width(10.dp))
+        }
+        val name = faces.firstOrNull()?.username
+        Text(
+            if (name != null) "Liked by $name and others" else "${formatCount(post.likes)} likes",
+            style = MaterialTheme.typography.bodyMedium
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PostInsightsSheet(post: Post, onDismiss: () -> Unit) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(
+            Modifier.padding(24.dp).padding(bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text("Post insights", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                Stat("views", post.views)
+                Stat("likes", post.likes)
+                Stat("comments", post.commentCount)
+            }
+            HorizontalDivider()
+            val rate = if (post.views > 0) post.likes.toDouble() / post.views * 100 else 0.0
+            Text("Engagement rate: ${String.format(java.util.Locale.US, "%.1f", rate)}%")
+            Text(
+                "Shared with your followers and through recommendations.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
