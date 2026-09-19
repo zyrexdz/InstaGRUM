@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android 12+ backup rules. Accounts, media and preferences are preserved so a
+  reinstall or a new phone restores your profiles. Nothing leaves the device
+  unless the user has Google backup enabled; local device-to-device transfer
+  works either way.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="file" path="accounts" />
+        <include domain="file" path="media" />
+        <include domain="sharedpref" path="local_accounts.xml" />
+        <exclude domain="sharedpref" path="notification_delivery.xml" />
+        <exclude domain="sharedpref" path="permissions.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="file" path="accounts" />
+        <include domain="file" path="media" />
+        <include domain="sharedpref" path="local_accounts.xml" />
+    </device-transfer>
+</data-extraction-rules>
