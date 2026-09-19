@@ -456,6 +456,8 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
     var ending by rememberSaveable { mutableStateOf(false) }
     var stats by rememberSaveable { mutableStateOf(false) }
     var front by rememberSaveable { mutableStateOf(true) }
+    var micOn by rememberSaveable { mutableStateOf(true) }
+    var cameraOn by rememberSaveable { mutableStateOf(true) }
     var heart by remember { mutableIntStateOf(0) }
     var visible by remember { mutableStateOf(false) }
     val chatState = rememberLazyListState()
@@ -472,7 +474,10 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
     InstaTheme(true) {
         Box(Modifier.fillMaxSize().background(Color.Black)) {
             if (live.config.thumbnail.path.isNotBlank()) MediaContent(live.config.thumbnail, Modifier.fillMaxSize())
-            else CameraCapture(front, false, 0, {}, Modifier.fillMaxSize())
+            else if (cameraOn) CameraCapture(front, false, 0, {}, Modifier.fillMaxSize())
+            else Box(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)), contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.VideocamOff, null, Modifier.size(54.dp), tint = Color.White.copy(alpha = .35f))
+            }
             Box(
                 Modifier.fillMaxSize().background(
                     Brush.verticalGradient(
@@ -486,28 +491,59 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
             )
             Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().padding(12.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    AvatarFromProfile(state.profile, Modifier.size(34.dp)); Spacer(Modifier.width(8.dp))
+                    AvatarFromProfile(state.profile, Modifier.size(32.dp))
+                    Spacer(Modifier.width(8.dp))
                     Text(
                         state.profile.username,
                         color = Color.White,
-                        modifier = Modifier.weight(1f),
-                        fontWeight = FontWeight.SemiBold
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1
                     )
+                    Icon(
+                        Icons.Default.KeyboardArrowDown,
+                        null,
+                        Modifier.size(20.dp).padding(start = 2.dp),
+                        tint = Color.White
+                    )
+                    Spacer(Modifier.weight(1f))
                     Text(
                         "LIVE",
                         color = Color.White,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.background(Color(0xFFE1306C), RoundedCornerShape(4.dp)).padding(7.dp, 4.dp)
+                        modifier = Modifier
+                            .background(Color(0xFFFF0169), RoundedCornerShape(50))
+                            .padding(horizontal = 13.dp, vertical = 5.dp)
                     )
-                    TextButton(onClick = { stats = true }) {
-                        Icon(
-                            Icons.Default.Visibility,
-                            null,
-                            tint = Color.White,
-                            modifier = Modifier.size(16.dp)
-                        ); Text(" ${live.viewers}", color = Color.White)
+                    Spacer(Modifier.width(8.dp))
+                    Row(
+                        Modifier
+                            .background(Color.White.copy(alpha = .22f), RoundedCornerShape(9.dp))
+                            .clickable { stats = true }
+                            .padding(horizontal = 9.dp, vertical = 5.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Default.RemoveRedEye, null, Modifier.size(15.dp), tint = Color.White)
+                        Text(
+                            "  ${formatCount(live.viewers.toLong())}",
+                            color = Color.White,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
                     }
-                    CreatorIcon(Icons.Default.Close, "End livestream", { ending = true })
+                    Icon(
+                        Icons.Default.MoreHoriz,
+                        "Live options",
+                        Modifier.padding(start = 6.dp).size(24.dp).clickable { stats = true },
+                        tint = Color.White
+                    )
+                    Icon(
+                        Icons.Default.Close,
+                        "End livestream",
+                        Modifier.padding(start = 6.dp).size(24.dp).clickable { ending = true },
+                        tint = Color.White
+                    )
                 }
                 Text(
                     live.config.title,
@@ -516,6 +552,33 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                     modifier = Modifier.padding(top = 10.dp)
                 )
                 if (state.settings.paused) Text("Activity paused", color = Color.White)
+                Row(Modifier.fillMaxWidth()) {
+                    Spacer(Modifier.weight(1f))
+                    Column(
+                        Modifier.padding(top = 18.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(22.dp)
+                    ) {
+                        Icon(
+                            if (micOn) Icons.Default.Mic else Icons.Default.MicOff,
+                            "Toggle microphone",
+                            Modifier.size(26.dp).clickable { micOn = !micOn },
+                            tint = Color.White.copy(alpha = if (micOn) 1f else .55f)
+                        )
+                        Icon(
+                            if (cameraOn) Icons.Default.Videocam else Icons.Default.VideocamOff,
+                            "Toggle camera",
+                            Modifier.size(26.dp).clickable { cameraOn = !cameraOn },
+                            tint = Color.White.copy(alpha = if (cameraOn) 1f else .55f)
+                        )
+                        Icon(
+                            Icons.Default.FlipCameraAndroid,
+                            "Switch camera",
+                            Modifier.size(26.dp).clickable(enabled = cameraOn) { front = !front },
+                            tint = Color.White.copy(alpha = if (cameraOn) 1f else .3f)
+                        )
+                    }
+                }
                 Spacer(Modifier.weight(1f))
                 Box(Modifier.fillMaxWidth().height(240.dp)) {
                     LazyColumn(
@@ -575,13 +638,6 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                         onClick = { onAction(Action.LiveComment(comment)); comment = "" },
                         enabled = comment.isNotBlank()
                     ) { Icon(Icons.AutoMirrored.Filled.Send, "Send live comment", tint = Color.White) }
-                    IconButton(onClick = { front = !front }) {
-                        Icon(
-                            Icons.Default.Cameraswitch,
-                            "Switch live camera",
-                            tint = Color.White
-                        )
-                    }
                     IconButton(onClick = {
                         onAction(Action.LiveLike); heart++; haptic.performHapticFeedback(
                         HapticFeedbackType.LongPress

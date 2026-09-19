@@ -148,6 +148,16 @@ private fun ContinuousGrowthControls(state: AppState) {
     var running by remember { mutableStateOf(preferences.getBoolean("enabled", false)) }
     val power = context.getSystemService(android.os.PowerManager::class.java)
     var unrestricted by remember { mutableStateOf(power?.isIgnoringBatteryOptimizations(context.packageName) == true) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) == true
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     ToggleSetting("Keep growing while closed", running) { enabled ->
         running = enabled
         preferences.edit().putBoolean("enabled", enabled).apply()
@@ -164,16 +174,9 @@ private fun ContinuousGrowthControls(state: AppState) {
                 "Android may end the service within minutes. Allow unrestricted battery use to keep it running.",
                 style = MaterialTheme.typography.bodySmall
             )
-            FilledTonalButton(onClick = {
-                runCatching {
-                    context.startActivity(
-                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            .setData(android.net.Uri.parse("package:${context.packageName}"))
-                    )
-                }.onFailure {
-                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
-                }
-            }) { Text("Allow unrestricted battery") }
+            FilledTonalButton(onClick = { requestUnrestrictedBattery(context) }) {
+                Text("Allow unrestricted battery")
+            }
         }
     }
     if (running) Text(
@@ -181,6 +184,20 @@ private fun ContinuousGrowthControls(state: AppState) {
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant
     )
+}
+
+private fun requestUnrestrictedBattery(context: android.content.Context) {
+    val targets = listOf(
+        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+            .setData(android.net.Uri.parse("package:${context.packageName}")),
+        Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+            .setData(android.net.Uri.parse("package:${context.packageName}")),
+        Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+    )
+    for (intent in targets) {
+        if (intent.resolveActivity(context.packageManager) == null) continue
+        if (runCatching { context.startActivity(intent) }.isSuccess) return
+    }
 }
 
 class BackupActions(

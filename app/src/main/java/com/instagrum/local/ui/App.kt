@@ -120,8 +120,14 @@ private fun AccountSwitcher(state: AppState, onAction: (Action) -> Unit, dismiss
 @Composable
 private fun ProfileStat(value: Long, label: String, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedNumber(value, size = 17.sp)
-        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        AnimatedNumber(value, size = 15.sp)
+        Text(
+            label,
+            fontSize = 13.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            modifier = Modifier.padding(top = 1.dp)
+        )
     }
 }
 
@@ -194,32 +200,45 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
                     Column(Modifier.padding(horizontal = 16.dp)) {
                         Row(
-                            Modifier.fillMaxWidth().height(48.dp),
+                            Modifier.fillMaxWidth().height(44.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Icon(
-                                Icons.Default.Add,
-                                "Create content",
-                                Modifier.size(27.dp).clickable { onAction(Action.Navigate("create")) })
+                            Box(Modifier.width(52.dp), contentAlignment = Alignment.CenterStart) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    "Create content",
+                                    Modifier.size(26.dp).clickable { onAction(Action.Navigate("create")) })
+                            }
                             Row(
                                 Modifier.weight(1f).clickable { accountsOpen = true },
                                 horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(profile.username, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                                Icon(Icons.Default.KeyboardArrowDown, "Switch account", Modifier.size(20.dp))
+                                Text(
+                                    profile.username,
+                                    fontSize = 19.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1
+                                )
+                                Icon(
+                                    Icons.Default.KeyboardArrowDown,
+                                    "Switch account",
+                                    Modifier.size(19.dp).padding(start = 3.dp)
+                                )
                             }
-                            Icon(
-                                Icons.Default.Menu,
-                                "Settings",
-                                Modifier.size(26.dp).clickable { onAction(Action.Navigate("settings")) })
+                            Box(Modifier.width(52.dp), contentAlignment = Alignment.CenterEnd) {
+                                Icon(
+                                    Icons.Default.Menu,
+                                    "Settings",
+                                    Modifier.size(25.dp).clickable { onAction(Action.Navigate("settings")) })
+                            }
                         }
-                        Spacer(Modifier.height(10.dp))
+                        Spacer(Modifier.height(8.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(Modifier.size(96.dp)) {
+                            Box(Modifier.size(88.dp)) {
                                 Box(
                                     Modifier.fillMaxSize()
-                                        .storyRing(unseenStories, 3.dp)
+                                        .storyRing(unseenStories, 2.5.dp)
                                         .padding(5.dp)
                                         .clickable {
                                             activeStories.firstOrNull { !it.seen }
@@ -230,30 +249,27 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                         }
                                 ) { AvatarFromProfile(profile, Modifier.fillMaxSize()) }
                                 Box(
-                                    Modifier.align(Alignment.BottomEnd).size(26.dp).clip(CircleShape)
+                                    Modifier.align(Alignment.BottomEnd).size(24.dp).clip(CircleShape)
                                         .background(MaterialTheme.colorScheme.background).padding(2.dp)
                                         .clip(CircleShape).background(ActionBlue)
                                         .clickable { onAction(Action.Navigate("create")) },
                                     contentAlignment = Alignment.Center
-                                ) { Icon(Icons.Default.Add, "Add", Modifier.size(16.dp), tint = Color.White) }
+                                ) { Icon(Icons.Default.Add, "Add", Modifier.size(15.dp), tint = Color.White) }
                             }
-                            Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                            Column(Modifier.weight(1f).padding(start = 12.dp)) {
                                 Text(
                                     profile.displayName,
-                                    fontSize = 16.sp,
+                                    fontSize = 15.sp,
                                     fontWeight = FontWeight.Bold,
-                                    modifier = Modifier.padding(bottom = 10.dp)
+                                    modifier = Modifier.padding(bottom = 12.dp)
                                 )
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween
-                                ) {
-                                    ProfileStat(state.posts.size.toLong(), "posts")
+                                Row(Modifier.fillMaxWidth()) {
+                                    ProfileStat(state.posts.size.toLong(), "posts", Modifier.weight(1f))
                                     ProfileStat(
                                         profile.followers,
                                         "followers",
-                                        Modifier.clickable { peopleSheet = "Followers" })
-                                    ProfileStat(state.posts.sumOf { it.likes }, "likes")
+                                        Modifier.weight(1f).clickable { peopleSheet = "Followers" })
+                                    ProfileStat(state.posts.sumOf { it.likes }, "likes", Modifier.weight(1f))
                                 }
                             }
                         }
@@ -348,19 +364,16 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                         Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                             listOf(
                                 Icons.Default.GridOn to "Posts",
-                                Icons.Default.PlayCircleOutline to "Reels",
-                                Icons.Default.Repeat to "Reposts",
-                                Icons.Default.AccountBox to "Tagged"
+                                Icons.Default.PlayCircleOutline to "Reels"
                             ).forEachIndexed { index, (icon, label) ->
-                                val tab = if (index == 3) 2 else index
-                                val active = currentTab == tab
+                                val active = currentTab == index
                                 Column(
                                     Modifier.weight(1f).clickable {
                                         onAction(
                                             Action.GridPosition(
                                                 grid.firstVisibleItemIndex,
                                                 grid.firstVisibleItemScrollOffset,
-                                                tab
+                                                index
                                             )
                                         )
                                     },

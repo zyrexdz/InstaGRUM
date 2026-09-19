@@ -201,8 +201,8 @@ fun BottomNav(state: AppState, onAction: (Action) -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf(
-                    "create" to Icons.Default.AddBox,
                     "notifications" to Icons.Default.FavoriteBorder,
+                    "create" to Icons.Default.AddBox,
                     "profile" to Icons.Default.Person
                 ).forEach { (tab, icon) ->
                     Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
