@@ -103,7 +103,6 @@ class AndroidStorageTest {
         assertEquals("first.account", back!!.profile.username)
         assertEquals("default", back.activeAccountId)
 
-        // Reopening the app must restore the account that was last in use.
         assertEquals("first.account", repository.load()?.profile?.username)
     }
 

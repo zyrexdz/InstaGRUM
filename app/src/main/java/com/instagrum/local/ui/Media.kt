@@ -59,7 +59,7 @@ fun MediaContent(
     val context = LocalContext.current
     val video = media.kind != MediaKind.IMAGE && media.path.isNotBlank()
     val source = media.path.ifBlank { "file:///android_asset/photos/${media.artwork.mod(9)}.jpg" }
-    // A persisted snapshot is never allowed to turn a media renderer into a network client.
+
     val uri =
         remember(source) { Uri.parse(source).takeIf { it.scheme in listOf("file", "content", "android.resource") } }
     Box(modifier.background(Color.Black), contentAlignment = Alignment.Center) {

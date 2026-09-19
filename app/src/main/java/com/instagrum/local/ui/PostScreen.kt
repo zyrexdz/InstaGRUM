@@ -44,7 +44,7 @@ fun PostDetail(state: AppState, postId: String, onAction: (Action) -> Unit) {
     val pagerState = rememberPagerState(initialPage = start) { state.posts.size }
     val posts by rememberUpdatedState(state.posts)
     LaunchedEffect(pagerState) {
-        // drop(1) skips the page we opened with, otherwise the dispatch would loop back into navigation.
+
         snapshotFlow { pagerState.currentPage }.distinctUntilChanged().drop(1)
             .collect { page -> posts.getOrNull(page)?.let { onAction(Action.OpenPost(it.id)) } }
     }
@@ -204,7 +204,6 @@ private fun CountAction(
     }
 }
 
-/** Overlapping portraits of recent likers, as Instagram shows under a post. */
 @Composable
 private fun LikedByRow(post: Post) {
     val faces = post.sampledLikers.take(3)

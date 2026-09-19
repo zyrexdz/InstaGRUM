@@ -27,6 +27,7 @@ import com.instagrum.local.simulation.GrowthPresets
 
 @Composable
 fun SettingsScreen(state: AppState, onAction: (Action) -> Unit, backup: BackupActions? = null) {
+    val context = LocalContext.current
     Scaffold(topBar = { ScreenHeader("Your pace", { onAction(Action.Navigate()) }) }) { padding ->
         LazyColumn(
             Modifier.fillMaxSize().padding(padding).testTag("settingsList"),
@@ -111,16 +112,35 @@ fun SettingsScreen(state: AppState, onAction: (Action) -> Unit, backup: BackupAc
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 16.dp)
                 )
+                Spacer(Modifier.height(20.dp))
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "InstaGRUM",
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        "Built by zyrexdz",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(onClick = {
+                        runCatching {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://github.com/zyrexdz"))
+                            )
+                        }
+                    }) { Text("github.com/zyrexdz") }
+                }
+                Spacer(Modifier.height(12.dp))
             }
         }
     }
 }
 
-/**
- * Continuous growth needs a foreground service, and Samsung's aggressive battery
- * management will still stop it unless the app is exempted, so both controls
- * live together.
- */
 @Composable
 private fun ContinuousGrowthControls(state: AppState) {
     val context = LocalContext.current
@@ -163,7 +183,6 @@ private fun ContinuousGrowthControls(state: AppState) {
     )
 }
 
-/** Manual backup/restore/delete, provided by the Activity so previews and tests can omit it. */
 class BackupActions(
     val export: (android.net.Uri) -> Unit,
     val import: (android.net.Uri) -> Unit,

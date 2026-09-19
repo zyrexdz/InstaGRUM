@@ -2,7 +2,6 @@ package com.instagrum.local.simulation
 
 import com.instagrum.local.model.*
 
-/** Lightweight, offline context used to make reactions fit a post or live. */
 data class CommentContext(
     val caption: String = "",
     val location: String = "",
@@ -279,7 +278,6 @@ object CommentGenerator {
         })
     }.distinct()
 
-    /** Large public pool retained for tests and callers that need generic text. */
     val pool: List<String> = genericPool
 
     private val realAvatars = (0..23).map { "file:///android_asset/avatars/$it.jpg" }
@@ -292,14 +290,11 @@ object CommentGenerator {
         return x and Int.MAX_VALUE
     }
 
-    /** Odd multiplier coprime with the identity space keeps index -> username collision free. */
     private val identitySpace = NameData.first.size * NameData.handle.size * NameData.patterns * NameData.tail.size
 
     fun person(index: Int): FakePerson {
         val n = index.coerceAtLeast(0)
-        // A bijective scramble inside the space guarantees distinct usernames for
-        // distinct indices; only wrapping past the whole space can repeat, and
-        // that suffix keeps those apart too.
+
         val block = n / identitySpace
         val scrambled = ((n % identitySpace).toLong() * 2_654_435_761L % identitySpace).toInt()
         val first = NameData.first[scrambled % NameData.first.size]
@@ -392,7 +387,7 @@ object CommentGenerator {
         if (context.mediaKind == MediaKind.REEL || context.mediaKind == MediaKind.VIDEO) relevant += videoLines
         val generic = if (live) liveTexts else genericPool
         if (relevant.isEmpty()) return generic
-        // Keep most reactions contextual, while retaining generic crowd behavior.
+
         return buildList {
             addAll(relevant)
             addAll(relevant)

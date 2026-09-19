@@ -23,9 +23,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.instagrum.local.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -116,6 +118,28 @@ private fun AccountSwitcher(state: AppState, onAction: (Action) -> Unit, dismiss
 }
 
 @Composable
+private fun ProfileStat(value: Long, label: String, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        AnimatedNumber(value, size = 17.sp)
+        Text(label, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+@Composable
+private fun ProfileButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(34.dp),
+        shape = RoundedCornerShape(10.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+        }
+    }
+}
+
+@Composable
 fun AppScaffold(state: AppState, onAction: (Action) -> Unit, content: @Composable (PaddingValues) -> Unit) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background,
@@ -139,6 +163,7 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
     }
     val profile = state.profile
     val activeStories = state.stories.filter { it.expiresAt > System.currentTimeMillis() }
+    val unseenStories = activeStories.any { !it.seen }
     val highlights = state.stories.filter { it.highlight.isNotBlank() }.distinctBy { it.highlight }
     val grid = rememberLazyGridState(state.session.gridIndex, state.session.gridOffset)
     val currentTab by rememberUpdatedState(state.session.gridTab)
@@ -167,115 +192,100 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(2.dp)
             ) {
                 item(span = { GridItemSpan(maxLineSpan) }) {
-                    Column(Modifier.padding(horizontal = 18.dp, vertical = 8.dp)) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.padding(horizontal = 16.dp)) {
+                        Row(
+                            Modifier.fillMaxWidth().height(48.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Default.Add,
+                                "Create content",
+                                Modifier.size(27.dp).clickable { onAction(Action.Navigate("create")) })
                             Row(
                                 Modifier.weight(1f).clickable { accountsOpen = true },
+                                horizontalArrangement = Arrangement.Center,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    profile.username,
-                                    style = MaterialTheme.typography.titleLarge,
-                                    fontWeight = FontWeight.Bold
-                                )
-                                Icon(Icons.Default.KeyboardArrowDown, "Switch account", Modifier.size(22.dp))
+                                Text(profile.username, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+                                Icon(Icons.Default.KeyboardArrowDown, "Switch account", Modifier.size(20.dp))
                             }
-                            IconButton(onClick = { onAction(Action.Navigate("create")) }) {
-                                Icon(
-                                    Icons.Default.AddBox,
-                                    "Create content"
-                                )
-                            }
-                            IconButton(onClick = { onAction(Action.Navigate("settings")) }) {
-                                Icon(
-                                    Icons.Default.Tune,
-                                    "Simulation settings"
-                                )
-                            }
+                            Icon(
+                                Icons.Default.Menu,
+                                "Settings",
+                                Modifier.size(26.dp).clickable { onAction(Action.Navigate("settings")) })
                         }
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(10.dp))
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Box(
-                                Modifier.size(90.dp).then(
-                                    if (activeStories.isNotEmpty()) Modifier.border(
-                                        2.dp,
-                                        StoryGradient,
-                                        CircleShape
-                                    ) else Modifier
-                                ).padding(5.dp)
-                                    .clickable {
-                                        activeStories.firstOrNull()?.let { onAction(Action.OpenStory(it.id)) }
-                                            ?: run { editOpen = true }
-                                    }) {
-                                AvatarFromProfile(profile, Modifier.fillMaxSize())
+                            Box(Modifier.size(96.dp)) {
+                                Box(
+                                    Modifier.fillMaxSize()
+                                        .storyRing(unseenStories, 3.dp)
+                                        .padding(5.dp)
+                                        .clickable {
+                                            activeStories.firstOrNull { !it.seen }
+                                                ?.let { onAction(Action.OpenStory(it.id)) }
+                                                ?: activeStories.firstOrNull()
+                                                    ?.let { onAction(Action.OpenStory(it.id)) }
+                                                ?: run { editOpen = true }
+                                        }
+                                ) { AvatarFromProfile(profile, Modifier.fillMaxSize()) }
+                                Box(
+                                    Modifier.align(Alignment.BottomEnd).size(26.dp).clip(CircleShape)
+                                        .background(MaterialTheme.colorScheme.background).padding(2.dp)
+                                        .clip(CircleShape).background(ActionBlue)
+                                        .clickable { onAction(Action.Navigate("create")) },
+                                    contentAlignment = Alignment.Center
+                                ) { Icon(Icons.Default.Add, "Add", Modifier.size(16.dp), tint = Color.White) }
                             }
-                            Spacer(Modifier.width(14.dp))
-                            Row(Modifier.weight(1f), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                Stat("posts", state.posts.size.toLong())
-                                Stat("followers", profile.followers, Modifier.clickable { peopleSheet = "Followers" })
-                                Stat("likes", state.posts.sumOf { it.likes })
+                            Column(Modifier.weight(1f).padding(start = 16.dp)) {
+                                Text(
+                                    profile.displayName,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.padding(bottom = 10.dp)
+                                )
+                                Row(
+                                    Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    ProfileStat(state.posts.size.toLong(), "posts")
+                                    ProfileStat(
+                                        profile.followers,
+                                        "followers",
+                                        Modifier.clickable { peopleSheet = "Followers" })
+                                    ProfileStat(state.posts.sumOf { it.likes }, "likes")
+                                }
                             }
                         }
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(5.dp)
-                        ) {
-                            Text(profile.displayName, fontWeight = FontWeight.SemiBold)
-                            if (profile.verified) Icon(
-                                Icons.Default.Verified,
-                                "Simulated verification",
-                                Modifier.size(16.dp),
-                                tint = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                        Text(profile.bio, style = MaterialTheme.typography.bodyMedium)
+                        if (profile.bio.isNotBlank()) Text(
+                            profile.bio,
+                            fontSize = 14.sp,
+                            modifier = Modifier.padding(top = 12.dp)
+                        )
                         Spacer(Modifier.height(14.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilledTonalButton(
-                                onClick = { editOpen = true },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(9.dp)
-                            ) { Text("Edit profile") }
-                            FilledTonalButton(
-                                onClick = { onAction(Action.Navigate("settings")) },
-                                modifier = Modifier.weight(1f),
-                                shape = RoundedCornerShape(9.dp)
-                            ) { Text("Your pace") }
-                        }
                         Surface(
                             onClick = { onAction(Action.Navigate("settings")) },
-                            shape = RoundedCornerShape(12.dp),
-                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = .4f)
+                            shape = RoundedCornerShape(10.dp),
+                            color = MaterialTheme.colorScheme.surface,
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                            Row(
-                                Modifier.fillMaxWidth().padding(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(Icons.Default.Insights, null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(10.dp))
-                                Column(Modifier.weight(1f)) {
-                                    Text("Profile insights", style = MaterialTheme.typography.labelLarge)
-                                    Text(
-                                        "${formatCount(profile.visits)} profile visits",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                Icon(
-                                    if (state.settings.paused || state.settings.frozen) Icons.Default.Pause else Icons.Default.PlayArrow,
-                                    "Simulation state"
+                            Column(Modifier.padding(14.dp)) {
+                                Text("Your dashboard", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                                Text(
+                                    "${formatCount(state.posts.sumOf { it.views })} views in the last 30 days.",
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
+                        Spacer(Modifier.height(10.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            ProfileButton("Edit profile", Modifier.weight(1f)) { editOpen = true }
+                            ProfileButton("Share profile", Modifier.weight(1f)) { editOpen = true }
+                        }
                         if (state.activeLive != null) TextButton(onClick = { onAction(Action.Navigate("live")) }) {
-                            Text(
-                                "● Return to live · ${
-                                    formatCount(
-                                        state.activeLive.viewers.toLong()
-                                    )
-                                } watching"
-                            )
+                            Text("● Return to live · ${formatCount(state.activeLive.viewers.toLong())} watching")
                         }
                     }
                 }
@@ -335,45 +345,54 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                 }
                             }
                         }
-                        Row(
-                            Modifier.fillMaxWidth().padding(top = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceEvenly
-                        ) {
+                        Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                             listOf(
                                 Icons.Default.GridOn to "Posts",
                                 Icons.Default.PlayCircleOutline to "Reels",
-                                Icons.Default.BookmarkBorder to "Saved"
+                                Icons.Default.Repeat to "Reposts",
+                                Icons.Default.AccountBox to "Tagged"
                             ).forEachIndexed { index, (icon, label) ->
-                                IconButton(onClick = {
-                                    onAction(
-                                        Action.GridPosition(
-                                            grid.firstVisibleItemIndex,
-                                            grid.firstVisibleItemScrollOffset,
-                                            index
+                                val tab = if (index == 3) 2 else index
+                                val active = currentTab == tab
+                                Column(
+                                    Modifier.weight(1f).clickable {
+                                        onAction(
+                                            Action.GridPosition(
+                                                grid.firstVisibleItemIndex,
+                                                grid.firstVisibleItemScrollOffset,
+                                                tab
+                                            )
                                         )
-                                    )
-                                }) {
+                                    },
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
                                     Icon(
                                         icon,
                                         label,
-                                        tint = if (currentTab == index) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                        Modifier.padding(vertical = 10.dp).size(24.dp),
+                                        tint = if (active) MaterialTheme.colorScheme.onSurface
+                                        else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Box(
+                                        Modifier.fillMaxWidth().height(1.5.dp).background(
+                                            if (active) MaterialTheme.colorScheme.onSurface else Color.Transparent
+                                        )
                                     )
                                 }
                             }
                         }
-                        HorizontalDivider(thickness = .5.dp)
                     }
                 }
                 if (posts.isEmpty()) item(span = { GridItemSpan(maxLineSpan) }) { EmptyGrid("No ${if (currentTab == 1) "videos" else if (currentTab == 2) "saved posts" else "posts"} yet. Create your next moment.") }
                 items(posts, key = { it.id }) { post ->
                     Box(
-                        Modifier.aspectRatio(.8f).testTag("grid-${post.id}")
+                        Modifier.aspectRatio(.75f).testTag("grid-${post.id}")
                             .clickable { onAction(Action.OpenPost(post.id)) }) {
                         MediaContent(post.media, Modifier.fillMaxSize(), description = post.caption)
                         if (post.media.kind != MediaKind.IMAGE) Icon(
                             Icons.Default.PlayArrow,
                             "Video",
-                            tint = androidx.compose.ui.graphics.Color.White,
+                            tint = Color.White,
                             modifier = Modifier.align(Alignment.TopEnd).padding(6.dp)
                         )
                     }

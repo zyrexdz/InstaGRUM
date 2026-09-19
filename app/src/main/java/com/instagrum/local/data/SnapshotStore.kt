@@ -8,7 +8,6 @@ import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
 
-/** Single-writer, versioned snapshot. A known-good generation survives interrupted writes. */
 class UnsupportedSnapshotVersion(version: Int) :
     IllegalStateException("Snapshot version $version requires a newer InstaGRUM. Your data has not been overwritten.")
 
@@ -47,7 +46,7 @@ class SnapshotStore(private val directory: File) {
         val temporary = File(directory, "instagrum-local-state.tmp")
         val bytes = json.encodeToString(state).toByteArray(Charsets.UTF_8)
         FileOutputStream(temporary).use { stream -> stream.write(bytes); stream.fd.sync() }
-        // Only rotate a readable primary. A damaged primary must not replace a good backup.
+
         if (file.exists() && runCatching { json.decodeFromString<AppState>(file.readText()) }.isSuccess) {
             Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING)
         }

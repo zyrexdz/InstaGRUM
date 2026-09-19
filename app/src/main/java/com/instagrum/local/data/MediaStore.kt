@@ -14,7 +14,6 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.util.UUID
 
-/** Never retain a provider URI: providers can revoke it or require network access later. */
 object MediaStore {
     const val MAX_BYTES = 250L * 1024 * 1024
 

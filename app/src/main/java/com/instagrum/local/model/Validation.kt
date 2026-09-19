@@ -43,7 +43,6 @@ fun LiveConfig.validated(): LiveConfig {
     )
 }
 
-/** Bound stored comment samples without orphaning nested replies or losing their ancestry. */
 fun List<Comment>.threadWindow(limit: Int = 180): List<Comment> {
     val byId = associateBy { it.id }
     val retained = linkedSetOf<String>()

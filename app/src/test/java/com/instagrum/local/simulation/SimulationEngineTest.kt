@@ -225,8 +225,7 @@ class SimulationEngineTest {
 
     @Test
     fun storiesReachTheFollowerNetworkAtEveryAccountSize() {
-        // Regression: a 300-follower account used to get zero story views because
-        // reach was capped by the preset's hourly story budget.
+
         val small = run(
             withContent(owned(GrowthPreset.NORMAL).copy(profile = Profile("me", "Me", followers = 300L)))
                 .copy(posts = emptyList()),

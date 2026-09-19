@@ -21,7 +21,6 @@ internal data class BackupPayload(
     val accounts: List<BackupAccount>,
 )
 
-/** One atomic snapshot per local account. No login, key, database, network or subscription. */
 class AppRepository(private val context: Context) {
     private val root = File(context.filesDir, "accounts")
     private val preferences = context.getSharedPreferences("local_accounts", Context.MODE_PRIVATE)
@@ -84,7 +83,6 @@ class AppRepository(private val context: Context) {
         backupJson.encodeToString(payload).toByteArray(Charsets.UTF_8)
     }
 
-    /** Returns how many accounts were restored. Existing accounts are replaced by id. */
     suspend fun importBackup(bytes: ByteArray): Int = withContext(Dispatchers.IO + NonCancellable) {
         val payload = backupJson.decodeFromString<BackupPayload>(bytes.toString(Charsets.UTF_8))
         require(payload.accounts.isNotEmpty()) { "That backup file contains no accounts." }
@@ -99,7 +97,6 @@ class AppRepository(private val context: Context) {
         payload.accounts.size
     }
 
-    /** Removes one account's snapshot. The last remaining account cannot be deleted. */
     suspend fun deleteAccount(id: String): AppState? = withContext(Dispatchers.IO + NonCancellable) {
         val clean = safe(id)
         val remaining = allStates().map { it.activeAccountId }.filterNot { it == clean }
@@ -110,7 +107,6 @@ class AppRepository(private val context: Context) {
         store(next).load()?.let { decorate(it, next) }
     }
 
-    /** Deletes imported media that no account references any more. */
     suspend fun collectUnusedMedia(context: Context): Int = withContext(Dispatchers.IO + NonCancellable) {
         val directory = File(context.filesDir, "media")
         if (!directory.isDirectory) return@withContext 0

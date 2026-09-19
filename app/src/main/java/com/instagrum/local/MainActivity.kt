@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onStart() {
         super.onStart(); viewModel.setForeground(true)
-        // Android may have killed the service; restore it if the user wants it.
+
         if (getSharedPreferences("growth_service", MODE_PRIVATE).getBoolean("enabled", false)) {
             runCatching { LocalNotifications.startContinuous(this) }
         }

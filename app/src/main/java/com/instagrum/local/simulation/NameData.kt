@@ -1,6 +1,5 @@
 package com.instagrum.local.simulation
 
-/** Combinatorial identity sources. Everything is indexed, never random, so replays stay stable. */
 internal object NameData {
     val first = listOf(
         "Maya", "Jordan", "Sam", "Luca", "Nora", "Kai", "Isabel", "Theo", "Avery", "Aria",
@@ -34,7 +33,6 @@ internal object NameData {
         "asis", "nofilter", "onrepeat", "someday"
     )
 
-    /** Empty entries are weighted heavily so most handles stay clean. */
     val tail =
         listOf("", "", "", "", "", "", "", "", "01", "02", "07", "09", "11", "21", "22", "88", "99", "x", "xo", "_")
 

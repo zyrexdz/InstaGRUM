@@ -52,7 +52,7 @@ class LocalNotifications(private val context: Context) {
         val fresh = after.activity.filter { it.id !in oldIds }.reversed()
         if (fresh.isEmpty() || !after.settings.notificationsEnabled || !allowed()) return
         val last = preferences.getLong("last_alert", 0L)
-        // One audible notification per short window; busy periods update a grouped card silently.
+
         val latest = fresh.last()
         val intent = Intent(context, MainActivity::class.java).putExtra(EXTRA_ACTIVITY, latest.id)
             .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -85,7 +85,7 @@ class LocalNotifications(private val context: Context) {
         try {
             NotificationManagerCompat.from(context).notify(1001, builder.build())
             preferences.edit().putLong("last_alert", System.currentTimeMillis()).apply()
-        } catch (_: SecurityException) { /* Permission can be revoked between the check and notify. */
+        } catch (_: SecurityException) {
         }
     }
 

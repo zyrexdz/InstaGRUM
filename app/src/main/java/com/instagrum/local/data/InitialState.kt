@@ -10,10 +10,8 @@ object InitialState {
         lastSavedAt = now, lastSimulationAt = now, profileCreated = false
     )
 
-    /** Preserve old content, but require ownership setup instead of silently retaining the demo identity. */
     fun migrate(state: AppState): AppState {
-        // Background catch-up became the default; profiles saved before that opt
-        // in once, and can still turn it off in settings.
+
         val base = if (state.schemaVersion < 2) state.copy(
             schemaVersion = 2,
             settings = state.settings.copy(backgroundActivity = true)

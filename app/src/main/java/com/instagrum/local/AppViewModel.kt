@@ -9,7 +9,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/** UI lifecycle adapter; the application runtime owns the only simulation and persistence writer. */
 class AppViewModel(application: Application) : AndroidViewModel(application) {
     private val runtime = SimulatorRuntime.get(application)
     val state = runtime.state

@@ -35,7 +35,7 @@ class ActivityPersistenceTest {
     @Test
     fun activityLaunchSaveStopAndColdReopenRestoresState() {
         val application = ApplicationProvider.getApplicationContext<Application>()
-        // Accounts each own a snapshot directory; "default" is the migrated one.
+
         val store = SnapshotStore(java.io.File(application.filesDir, "accounts/default"))
         store.save(
             InitialState.create(System.currentTimeMillis()).copy(

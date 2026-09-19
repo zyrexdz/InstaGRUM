@@ -12,7 +12,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.util.UUID
 
-/** Foreground and WorkManager share one process-wide writer. No background service or network. */
 class SimulatorRuntime private constructor(context: Context) {
     companion object {
         @Volatile
@@ -113,7 +112,7 @@ class SimulatorRuntime private constructor(context: Context) {
                 if (action is Action.GridPosition || action is Action.StoryProgress || action is Action.SaveDraft) mutableState.value =
                     after
                 else save(before, after)
-                // Reclaim imported files once nothing points at them any more.
+
                 if (action is Action.DeletePost || action is Action.DeleteStory || action is Action.EditProfile) {
                     runCatching { repository.collectUnusedMedia(appContext) }
                 }
@@ -148,11 +147,6 @@ class SimulatorRuntime private constructor(context: Context) {
         }
     }
 
-    /**
-     * Advances every account while the app is closed. Unlike [advanceBackground]
-     * this runs on a short loop from the foreground service, so growth is
-     * continuous rather than a periodic catch-up.
-     */
     suspend fun advanceWhileClosed() {
         load()
         mutex.withLock {

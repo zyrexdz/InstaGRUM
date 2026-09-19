@@ -18,7 +18,6 @@ data class Profile(
 @Serializable
 enum class MediaKind { IMAGE, VIDEO, REEL }
 
-/** Empty paths use the bundled, entirely offline artwork indicated by artwork. */
 @Serializable
 data class Media(val path: String = "", val kind: MediaKind = MediaKind.IMAGE, val artwork: Int = 0)
 
@@ -194,6 +193,7 @@ data class LiveSession(
     val seed: Long = 73492L,
     val carry: Map<String, Double> = emptyMap(),
     val surgeUntil: Double = 0.0,
+    val hypeUntil: Double = 0.0,
     val audience: List<LiveViewer> = emptyList(),
     val arrivalClock: Double = -1.0,
     val chatClock: Double = -1.0,

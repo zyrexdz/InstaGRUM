@@ -2,7 +2,6 @@ package com.instagrum.local.simulation
 
 import com.instagrum.local.model.*
 
-/** Product calibration, not Instagram's proprietary algorithm. See docs/GROWTH_RESEARCH.md. */
 object GrowthPresets {
     val choices = listOf(
         GrowthPreset.DEAD,
@@ -53,9 +52,7 @@ object GrowthPresets {
     }
 
     fun profile(preset: GrowthPreset): GrowthProfile = when (preset) {
-        // These are distribution capacities, not guaranteed counters. Posts are
-        // intentionally much more discoverable than stories: a story is shown to
-        // the existing audience, while a post/reel can enter recommendations.
+
         GrowthPreset.DEAD -> GrowthProfile(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
         GrowthPreset.VERY_SLOW -> GrowthProfile(0.08, 0.0, 0.0, 15.0, 25.0, 60.0, 0.0)
         GrowthPreset.SLOW -> GrowthProfile(0.18, 0.0, 0.0, 50.0, 90.0, 250.0, 0.0)

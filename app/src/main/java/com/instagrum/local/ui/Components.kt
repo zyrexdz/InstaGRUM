@@ -18,6 +18,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -31,10 +34,28 @@ import com.instagrum.local.model.*
 import java.text.NumberFormat
 import java.util.Locale
 
-val StoryGradient = Brush.linearGradient(listOf(Color(0xFFFFC65B), Color(0xFFEF5975), Color(0xFFAF68DA)))
-val HeartColor = Color(0xFFF05B77)
+val StoryGradient = Brush.linearGradient(
+    listOf(
+        Color(0xFFFEDA75),
+        Color(0xFFFA7E1E),
+        Color(0xFFD62976),
+        Color(0xFF962FBF),
+        Color(0xFF4F5BD5)
+    )
+)
+private val RingStops = listOf(
+    Color(0xFFFEDA75), Color(0xFFFA7E1E), Color(0xFFD62976),
+    Color(0xFF962FBF), Color(0xFF4F5BD5), Color(0xFFFEDA75)
+)
+val HeartColor = Color(0xFFFF3040)
 
-/** Original, deterministic illustrated portraits; none represents a real account. */
+fun Modifier.storyRing(unseen: Boolean, stroke: Dp = 2.5.dp): Modifier = drawBehind {
+    val width = stroke.toPx()
+    val radius = size.minDimension / 2 - width / 2
+    if (unseen) drawCircle(Brush.sweepGradient(RingStops), radius, style = Stroke(width))
+    else drawCircle(IgSeenRing, radius, style = Stroke(width))
+}
+
 @Composable
 fun LocalArtwork(
     artwork: Int,
@@ -112,14 +133,17 @@ fun AvatarFromProfile(profile: Profile, modifier: Modifier = Modifier.size(86.dp
 }
 
 @Composable
-fun AnimatedNumber(value: Long, modifier: Modifier = Modifier) {
+fun AnimatedNumber(value: Long, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.TextUnit = 16.sp) {
     AnimatedContent(
         formatCount(value),
-        transitionSpec = { fadeIn() togetherWith fadeOut() },
+        transitionSpec = {
+            (slideInVertically(Motion.enter()) { it / 2 } + fadeIn(Motion.quick()))
+                .togetherWith(slideOutVertically(Motion.quick()) { -it / 2 } + fadeOut(Motion.quick()))
+        },
         label = "stat",
         modifier = modifier
     ) {
-        Text(it, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1)
+        Text(it, fontSize = size, fontWeight = FontWeight.Bold, maxLines = 1)
     }
 }
 
@@ -177,8 +201,6 @@ fun BottomNav(state: AppState, onAction: (Action) -> Unit) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 listOf(
-                    "home" to Icons.Default.Home,
-                    "reels" to Icons.Default.SmartDisplay,
                     "create" to Icons.Default.AddBox,
                     "notifications" to Icons.Default.FavoriteBorder,
                     "profile" to Icons.Default.Person
@@ -195,8 +217,7 @@ fun BottomNav(state: AppState, onAction: (Action) -> Unit) {
                                 tint = if (selected == tab) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
-                        // The badge lives outside IconButton: that button clips its
-                        // content to a circle, which would slice the pill in half.
+
                         AnimatedContent(
                             targetState = if (tab == "notifications") totalNew else 0L,
                             transitionSpec = { scaleIn(spring(dampingRatio = .5f)) + fadeIn() togetherWith scaleOut() + fadeOut() },
@@ -296,6 +317,5 @@ fun formatTime(timestamp: Long): String = ((System.currentTimeMillis() - timesta
     }
 }
 
-/** Absolute date, as Instagram shows beneath an older post. */
 fun formatDate(timestamp: Long): String =
     java.text.SimpleDateFormat("MMMM d, yyyy", Locale.US).format(java.util.Date(timestamp))

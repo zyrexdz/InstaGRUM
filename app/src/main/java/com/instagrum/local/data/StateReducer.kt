@@ -4,7 +4,6 @@ import com.instagrum.local.model.*
 import com.instagrum.local.simulation.CommentGenerator
 import com.instagrum.local.simulation.GrowthPresets
 
-/** All user mutations are pure and testable. Simulation randomness lives in the engine, not UI. */
 object StateReducer {
     private const val LIMIT = 9_000_000_000_000L
     private fun Long.stat() = coerceIn(0, LIMIT)
@@ -50,9 +49,7 @@ object StateReducer {
 
             is Action.ChooseGrowth -> s.copy(
                 settings = GrowthPresets.settings(action.preset, s.settings),
-                // Clearing the hazard clocks and viral waves makes every existing
-                // post, story and live adopt the new pace immediately instead of
-                // finishing at the pace they were created under.
+
                 engine = s.engine.copy(
                     clocks = emptyMap(),
                     pending = emptyList(),
@@ -321,6 +318,10 @@ object StateReducer {
                 session = UiSession(screen = "history"))
 
             Action.LiveLike -> s.copy(activeLive = s.activeLive?.let { it.copy(likes = (it.likes + 1).stat()) })
+            Action.LiveHype -> s.copy(activeLive = s.activeLive?.let {
+                it.copy(hypeUntil = it.elapsedSeconds + 150.0)
+            })
+
             is Action.LiveComment -> if (action.text.isBlank()) s else s.copy(activeLive = s.activeLive?.let {
                 it.copy(
                     chat = (it.chat + ownComment(action.text)).takeLast(80),

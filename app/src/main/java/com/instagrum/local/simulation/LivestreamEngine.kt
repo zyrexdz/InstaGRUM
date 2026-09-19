@@ -4,7 +4,7 @@ import com.instagrum.local.model.*
 import kotlin.math.*
 
 object LivestreamEngine {
-    /** Seconds already include simulation speed. UI uses 1x; test tools can still accelerate time. */
+
     fun step(
         session: LiveSession,
         seconds: Double,
@@ -41,10 +41,9 @@ object LivestreamEngine {
         val elapsed = (s.elapsedSeconds + dt).coerceAtMost(c.durationMinutes * 60.0)
         val pace = GrowthPresets.factor(settings.preset)
         val accountFollowerCount = accountFollowers.toDouble()
-        // Live reach follows the same idea as posts: the follower network sets
-        // the scale, discovery adds a floor, and nothing is a fixed number.
+
         val followerCapacity = if (pace <= 0.0 || accountFollowerCount <= 0.0) 0.0 else accountFollowerCount * (
-                .004 + sqrt(pace) * .0065
+                .012 + sqrt(pace) * .022
                 )
         val discoveryBase = when (settings.preset) {
             GrowthPreset.DEAD -> 0.0
@@ -57,16 +56,16 @@ object LivestreamEngine {
             GrowthPreset.EXTREME -> 120.0
             GrowthPreset.CELEBRITY -> 400.0
         }
-        // Live discovery is bounded by the account's network. High pace can
-        // open a recommendation lane, but 100 followers should not create a
-        // thousand-person room by accident.
+
         val discoveryCapacity = discoveryBase * (1.0 + ln(accountFollowerCount + 1.0) * .35)
         val configuredCapacity = maxOf(c.minViewers, c.startingViewers, s.viewers)
-        // Each session differs: the same account never pulls the same room twice.
+
         val sessionAppeal = .72 + (s.id.hashCode().toLong().and(0x7fffffff) % 1000) / 1450.0
+
+        val drift = .78 + .3 * sin(elapsed / 190.0) + .12 * sin(elapsed / 47.0)
         val naturalCapacity = maxOf(
             configuredCapacity.toDouble(),
-            (followerCapacity + discoveryCapacity) * sessionAppeal *
+            (followerCapacity + discoveryCapacity) * sessionAppeal * drift *
                     settings.liveViewerMultiplier.coerceAtLeast(0.0)
         )
         val timing = HumanTiming(rng, s.carry)
@@ -93,26 +92,30 @@ object LivestreamEngine {
         ) surgeUntil = elapsed + 180
         val surge =
             if (surgeUntil > elapsed) 1 + 3 * sin(PI * ((surgeUntil - elapsed) / 180).coerceIn(0.0, 1.0)) else 1.0
-        // The room starts empty. Discovery ramps up; nothing adds the same batch every second.
+
         val ramp = if (elapsed < 4) 0.0 else (1 - exp(-(elapsed - 4) / 55))
         val lateFade = (1 - .6 * (elapsed / (c.durationMinutes * 60.0)).pow(3)).coerceAtLeast(.25)
+        val hypeActive = s.hypeUntil > elapsed
+        val hype = if (hypeActive) 1 + 1.6 * sin(PI * ((s.hypeUntil - elapsed) / 150.0).coerceIn(0.0, 1.0)) else 1.0
         val capacity = c.maxViewers.coerceIn(0, 50_000_000)
-            .coerceAtMost(naturalCapacity.coerceIn(0.0, 50_000_000.0).roundToInt().coerceAtLeast(c.minViewers))
-        // The named audience stays small for chat and follow sampling; the room
-        // size itself is a number so millions of viewers cost no memory.
+            .coerceAtMost((naturalCapacity * hype).coerceIn(0.0, 50_000_000.0).roundToInt().coerceAtLeast(c.minViewers))
         val headroom = (capacity - s.viewers).coerceAtLeast(0)
-        val room = if (capacity <= 0) 0.0 else (headroom.toDouble() / capacity).coerceIn(0.0, 1.0)
-        val joinRate = (
-                (capacity * .035 + .08) *
-                        (c.growthPerMinute / 65).coerceIn(0.0, 10.0) *
-                        settings.liveViewerMultiplier.coerceAtLeast(0.0) * phase * ramp * surge * lateFade * room
-                ).coerceAtLeast(0.0)
-        val arrivals = timing.events("arrivals", dt * joinRate, 5_000_000).coerceAtMost(headroom)
-        // Viewers leave continuously; the average stay sets how fast the room drains.
+        val fill = if (capacity <= 0) 1.0 else (s.viewers.toDouble() / capacity).coerceIn(0.0, 4.0)
         val averageStay = (150.0 / (c.declinePerMinute / 35.0).coerceIn(.2, 5.0)).coerceAtLeast(20.0)
         val leaveRate = s.viewers / averageStay
+
+        val discoveryPull = (1.0 - fill).coerceAtLeast(0.0)
+
+        val replacement = leaveRate * (0.55 + 0.6 * phase).coerceIn(0.0, 1.05)
+        val discovery = capacity * .05 * discoveryPull *
+                (c.growthPerMinute / 65).coerceIn(0.0, 10.0) *
+                settings.liveViewerMultiplier.coerceAtLeast(0.0) * phase * ramp * surge * lateFade
+        val joinRate = (replacement * ramp + discovery).coerceAtLeast(0.0)
+        val arrivals = timing.events("arrivals", dt * joinRate, 5_000_000)
         val departures = timing.events("departures", dt * leaveRate, 5_000_000).coerceAtMost(s.viewers)
-        val viewerCount = (s.viewers + arrivals - departures).coerceIn(c.minViewers, capacity)
+
+        val ceiling = (capacity * 1.18).roundToInt().coerceAtLeast(c.minViewers)
+        val viewerCount = (s.viewers + arrivals - departures).coerceIn(c.minViewers, ceiling)
 
         val departed = audience.filter { it.leavesAt <= elapsed }
         audience = audience.filter { it.leavesAt > elapsed }
@@ -125,7 +128,7 @@ object LivestreamEngine {
         }
         audience = (audience + newViewers).distinctBy { it.person.id }
         val chatters = audience.filter { it.talkative && elapsed - it.joinedAt > 6 }
-        // Chat volume tracks the whole room, not just the sampled people.
+
         val chatPressure = (viewerCount.toDouble() / audience.size.coerceAtLeast(1)).coerceIn(1.0, 400.0)
         val chatCount = timing.events(
             "chat",
@@ -156,7 +159,7 @@ object LivestreamEngine {
         val followActors =
             departed.filter { elapsed - it.joinedAt > 45 && it.person.id !in alreadyFollowed && rng.next() < .025 }
                 .map { it.person.copy(followsYou = true) }
-        // Departing viewers beyond the named sample convert too.
+
         val sampledDepartures = departed.size
         val bulkDepartures = (departures - sampledDepartures).coerceAtLeast(0)
         val bulkFollowers = timing.events("live-follow", bulkDepartures * .025, 1_000_000).toLong()
@@ -177,6 +180,7 @@ object LivestreamEngine {
             phaseUntil = phaseUntil,
             initialized = true,
             surgeUntil = surgeUntil,
+            hypeUntil = s.hypeUntil,
             endedAt = if (elapsed >= c.durationMinutes * 60) now else null
         )
     }

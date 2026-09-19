@@ -53,7 +53,7 @@ object SimulationEngine {
             }
             phaseUntil = elapsed + rng.logNormal(110.0, .65).coerceIn(30.0, 420.0)
         }
-        // Gradual day/night influence; never make every counter move on the same tick.
+
         val dayPosition = (now % 86400000L) / 86400000.0
         val dayFactor = .7 + .3 * cos(2 * PI * (dayPosition - .75))
         val followerCount = s.profile.followers.coerceAtLeast(0L).toDouble()
@@ -154,19 +154,13 @@ object SimulationEngine {
             val appeal = contentAppeal(post.id, post.viralPotential)
             val attention = contentAttention(age, post.media.kind == MediaKind.REEL)
             val postWave = if (post.media.kind == MediaKind.REEL) 1.25 else 1.0
-            // A post receives a follower test plus recommendation distribution.
-            // The latter exists even at zero followers, and is deliberately noisy:
-            // pace is a distribution environment, not a guaranteed result.
-            // Reach per hour scales with the audience size; a 10M account puts a
-            // new post in front of millions within minutes, which is why huge
-            // accounts collect six-figure like counts almost immediately.
+
             val followerRate = if (distributionRate <= 0.0) 0.0 else (
                     followerCount * (1.4 + sqrt(GrowthPresets.factor(settings.preset)) * 5.5)
                     ).coerceAtMost(2_000_000_000.0)
             val observedLikes = post.likes.toDouble() / post.views.coerceAtLeast(1L)
             val observedComments = post.commentCount.toDouble() / post.views.coerceAtLeast(1L)
-            // A brand-new post has no signal yet, so it must not be judged as a
-            // weak one. Momentum only takes over once real reactions exist.
+
             val measured = ((observedLikes / .08) * .72 + (observedComments / .006) * .28).coerceIn(.35, 2.4)
             val confidence = (post.views.toDouble() / 400.0).coerceIn(0.0, 1.0)
             val engagementSignal = 1.0 + (measured - 1.0) * confidence
@@ -213,9 +207,7 @@ object SimulationEngine {
             val age = (elapsed - story.publishedAtSimulation).coerceAtLeast(0.0)
             val attention = if (age < 12) 0.0 else (1 - exp(-(age - 12) / 180)) * (1 + age / 3600).pow(-1.3)
             val wave = if (storySurgeUntil > elapsed) 1 + 3 * ((storySurgeUntil - elapsed) / 600) else 1.0
-            // Stories stay inside the follower network, but a real account shows
-            // a story to a large share of its followers within the first hours.
-            // Pace changes how fast they arrive, never whether they exist.
+
             val storyAudience = if (followerCount <= 0.0) 0.0 else
                 followerCount * (.55 + sqrt(GrowthPresets.factor(settings.preset)) * .35)
             val count =
@@ -255,8 +247,7 @@ object SimulationEngine {
                 )
                 if (rng.next() < .008) schedule(InteractionKind.STORY_REPLY, actor, storyId = story.id)
             }
-            // Viewers beyond the named sample still count toward the totals, so a
-            // large account sees realistic insights without storing every person.
+
             val anonymousStoryViews = (count - namedStoryViews).coerceAtLeast(0)
             if (anonymousStoryViews > 0) {
                 val bulkReactions = timing.events("story-react:${story.id}", anonymousStoryViews * .07, 500_000)

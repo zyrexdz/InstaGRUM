@@ -1,6 +1,5 @@
 package com.instagrum.local.simulation
 
-/** Explicit xorshift state survives process death, unlike platform Random. */
 class SimRandom(seed: Long) {
     var seed: Long = if (seed == 0L) 814729L else seed
         private set

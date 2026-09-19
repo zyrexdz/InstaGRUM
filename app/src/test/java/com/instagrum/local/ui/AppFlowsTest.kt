@@ -54,7 +54,7 @@ class AppFlowsTest {
         compose.onNodeWithText("my.world").assertIsDisplayed()
         compose.onNodeWithContentDescription("create").performClick()
         compose.onNodeWithText("POST").performClick()
-        // Gallery is an Android document picker; use a bundled cover to finish the flow offline.
+
         compose.runOnIdle {
             dispatch(
                 Action.CreatePost(
@@ -78,9 +78,11 @@ class AppFlowsTest {
     fun chooseSlowGrowthPaceFromSettings() {
         launch()
         completeOnboarding()
-        compose.onNodeWithContentDescription("Simulation settings").performClick()
+        compose.onNodeWithContentDescription("Settings").performClick()
+        compose.onNodeWithTag("settingsList").performScrollToNode(hasTestTag("pace-SLOW"))
         compose.onNodeWithTag("pace-SLOW").performClick()
         compose.runOnIdle { assertEquals(GrowthPreset.SLOW, state.value.settings.preset) }
+        compose.onNodeWithTag("settingsList").performScrollToNode(hasTestTag("pace-FAST"))
         compose.onNodeWithTag("pace-FAST").performClick()
         compose.runOnIdle { assertEquals(GrowthPreset.FAST, state.value.settings.preset) }
     }
@@ -89,9 +91,9 @@ class AppFlowsTest {
     fun storyOpensInsightsWithViewerList() {
         launch()
         completeOnboarding()
-        // Keep the story's 7-second playback paused during UI assertions.
+
         compose.mainClock.autoAdvance = false
-        // Stories are follower-network content; give this UI fixture an audience.
+
         state.value = state.value.copy(profile = state.value.profile.copy(followers = 1_000))
         state.value = StateReducer.reduce(
             state.value,
@@ -100,7 +102,7 @@ class AppFlowsTest {
             "ui-${sequence++}"
         )
         compose.waitForIdle()
-        // Complete the short navigation animation, but not the story's 7-second timer.
+
         compose.mainClock.advanceTimeBy(1_000)
         compose.waitForIdle()
         compose.onNodeWithTag("storyViewer").assertExists()

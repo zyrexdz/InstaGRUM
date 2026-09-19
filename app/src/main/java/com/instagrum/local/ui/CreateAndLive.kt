@@ -5,6 +5,7 @@ import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,8 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
     var textEditor by rememberSaveable { mutableStateOf(false) }
     var stickers by rememberSaveable { mutableStateOf(false) }
     var publishing by remember { mutableStateOf(false) }
+    var recording by remember { mutableStateOf(false) }
+    var recordProgress by remember { mutableFloatStateOf(0f) }
     var closeFriends by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val shareProgress = remember { Animatable(0f) }
@@ -65,7 +68,7 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
     LaunchedEffect(publishing) {
         if (!publishing) return@LaunchedEffect
         shareProgress.animateTo(1f, tween(850, easing = FastOutSlowInEasing))
-        // This is a local commit animation, not a fake network upload.
+
         if (live) onAction(
             Action.StartLive(
                 LiveConfig(
@@ -125,7 +128,16 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
                                     Modifier.fillMaxSize(),
                                     onChange = { update(draft.copy(overlay = it)) })
                             }
-                        } else CameraCapture(front, flash, capture, ::select, Modifier.fillMaxSize())
+                        } else CameraCapture(
+                            front,
+                            flash,
+                            capture,
+                            ::select,
+                            Modifier.fillMaxSize(),
+                            recording = recording,
+                            onRecordingFinished = { media -> recording = false; select(media) },
+                            onRecordingProgress = { recordProgress = it }
+                        )
                     }
                     Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                         CreatorIcon(Icons.AutoMirrored.Filled.ArrowBack, "Back", ::back)
@@ -176,7 +188,9 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
                         )
                     }
                     if (draft.stage == "camera" && !live) Text(
-                        if (reel) "Choose a video from your gallery" else "Capture or choose your own photo",
+                        if (story) "Tap for a photo, hold to record"
+                        else if (reel) "Choose a video from your gallery"
+                        else "Capture or choose your own photo",
                         color = Color.White.copy(alpha = .65f),
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.align(Alignment.BottomCenter).padding(16.dp)
@@ -248,33 +262,55 @@ fun CreateScreen(state: AppState, onAction: (Action) -> Unit) {
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         GalleryButton(selectedKind, ::select)
-                        Box(
-                            Modifier.size(84.dp).border(
-                                3.dp,
-                                if (live) Brush.linearGradient(
-                                    listOf(
-                                        Color(0xFFFF7855),
-                                        Color(0xFFEA3CAE),
-                                        Color(0xFFB644E8)
-                                    )
-                                ) else Brush.linearGradient(listOf(Color.White, Color.White)),
-                                CircleShape
+                        Box(Modifier.size(84.dp), contentAlignment = Alignment.Center) {
+                            if (story && recording) CircularProgressIndicator(
+                                progress = { recordProgress },
+                                modifier = Modifier.fillMaxSize(),
+                                color = Color(0xFFFF3040),
+                                strokeWidth = 4.dp,
+                                trackColor = Color.Transparent
                             )
-                                .padding(7.dp).clip(CircleShape)
-                                .background(if (live) Color.White else Color.White.copy(alpha = .96f))
-                                .testTag(if (live) "startLiveButton" else "shutter")
-                                .clickable(enabled = !publishing) {
-                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                    if (live) publishing = true else if (!reel) capture++
-                                }, contentAlignment = Alignment.Center
-                        ) {
-                            if (live) Icon(
-                                Icons.Default.WifiTethering,
-                                "Start simulated live",
-                                tint = Color.Black,
-                                modifier = Modifier.size(38.dp)
-                            )
-                            else if (reel) Icon(Icons.Default.VideoLibrary, "Import a reel", tint = Color.Black)
+                            Box(
+                                Modifier.fillMaxSize().border(
+                                    3.dp,
+                                    if (live) Brush.linearGradient(
+                                        listOf(
+                                            Color(0xFFFF7855),
+                                            Color(0xFFEA3CAE),
+                                            Color(0xFFB644E8)
+                                        )
+                                    ) else Brush.linearGradient(listOf(Color.White, Color.White)),
+                                    CircleShape
+                                )
+                                    .padding(7.dp).clip(CircleShape)
+                                    .background(if (live) Color.White else Color.White.copy(alpha = .96f))
+                                    .testTag(if (live) "startLiveButton" else "shutter")
+                                    .then(
+                                        if (story && !publishing) Modifier.pointerInput(Unit) {
+                                            detectTapGestures(onPress = {
+                                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                                val start = System.currentTimeMillis()
+                                                recording = true
+                                                tryAwaitRelease()
+
+                                                if (System.currentTimeMillis() - start < 350) {
+                                                    recording = false; capture++
+                                                } else recording = false
+                                            })
+                                        } else Modifier.clickable(enabled = !publishing) {
+                                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                            if (live) publishing = true else if (!reel) capture++
+                                        }
+                                    ), contentAlignment = Alignment.Center
+                            ) {
+                                if (live) Icon(
+                                    Icons.Default.WifiTethering,
+                                    "Start simulated live",
+                                    tint = Color.Black,
+                                    modifier = Modifier.size(38.dp)
+                                )
+                                else if (reel) Icon(Icons.Default.VideoLibrary, "Import a reel", tint = Color.Black)
+                            }
                         }
                         CreatorIcon(Icons.Default.Cameraswitch, "Switch camera", { front = !front })
                     }
@@ -551,6 +587,10 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                         HapticFeedbackType.LongPress
                     )
                     }) { Icon(Icons.Default.FavoriteBorder, "Like livestream", tint = Color.White) }
+                    HypeButton(live.hypeUntil > live.elapsedSeconds) {
+                        onAction(Action.LiveHype)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
                 }
             }
         }
@@ -568,6 +608,29 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
             Text("${formatCount(live.newFollowers)} new followers · ${formatDuration(live.elapsedSeconds)}")
         }
     }
+}
+
+@Composable
+private fun HypeButton(active: Boolean, onClick: () -> Unit) {
+    val pulse = rememberInfiniteTransition(label = "hype")
+    val glow by pulse.animateFloat(
+        initialValue = .65f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "glow"
+    )
+    val scale by animateFloatAsState(if (active) 1.12f else 1f, Motion.pop(), label = "hype-scale")
+    Box(
+        Modifier.size(46.dp).graphicsLayer {
+            scaleX = scale; scaleY = scale; alpha = if (active) glow else 1f
+        }.clip(CircleShape)
+            .background(
+                if (active) Brush.linearGradient(listOf(Color(0xFFFA7E1E), Color(0xFFD62976)))
+                else Brush.linearGradient(listOf(Color.White.copy(alpha = .18f), Color.White.copy(alpha = .18f)))
+            )
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) { Icon(Icons.Default.Bolt, "Hype the room", tint = Color.White, modifier = Modifier.size(26.dp)) }
 }
 
 @Composable

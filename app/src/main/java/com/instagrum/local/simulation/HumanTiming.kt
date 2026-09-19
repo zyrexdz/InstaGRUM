@@ -2,14 +2,11 @@ package com.instagrum.local.simulation
 
 import kotlin.math.*
 
-/** Exponential hazard thresholds give genuine no-change intervals instead of rounded rate counters. */
 class HumanTiming(private val random: SimRandom, previous: Map<String, Double>) {
     val clocks = previous.toMutableMap()
     fun events(key: String, expected: Double, limit: Int = 30): Int {
         if (!expected.isFinite() || expected <= 0 || limit <= 0) return 0
-        // Iterating once per arrival is ideal for small human-scale streams, but
-        // would freeze the UI on a post reaching millions of people. A normal
-        // approximation preserves seeded variation for large batches.
+
         if (expected >= 20.0) {
             val gaussian = (0 until 12).sumOf { random.next() } - 6.0
             val sampled = (expected + sqrt(expected) * gaussian).roundToInt().coerceIn(0, limit)
@@ -39,9 +36,7 @@ fun contentAppeal(id: String, viralPotential: Int = 35): Double {
 }
 
 fun contentAttention(ageSeconds: Double, reel: Boolean): Double {
-    // Feed distribution starts with a small test audience, then ramps quickly as
-    // people watch and react. The tail decays hard so a post is a genuine spike
-    // instead of growing forever.
+
     if (ageSeconds < 4) return 0.0
     val ramp = 1 - exp(-(ageSeconds - 4) / if (reel) 70.0 else 48.0)
     val decay = (1 + ageSeconds / if (reel) 3600.0 else 2400.0).pow(if (reel) -1.35 else -1.5)

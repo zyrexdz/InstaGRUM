@@ -22,14 +22,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
-/**
- * Keeps the simulation advancing while the app is closed.
- *
- * Android only allows indefinite background execution through a foreground
- * service, which must show an ongoing notification. That notification is the
- * trade: in exchange, growth continues second by second instead of waiting for
- * a periodic worker.
- */
 class GrowthService : Service() {
     companion object {
         const val CHANNEL = "continuous_growth"
@@ -67,7 +59,7 @@ class GrowthService : Service() {
                 }
             }
         }
-        // START_STICKY asks Android to restart the service if it is ever killed.
+
         return START_STICKY
     }
 
