@@ -18,3 +18,7 @@
 
 # WorkManager instantiates the background worker reflectively by class name.
 -keep class com.instagrum.local.notifications.ActivityWorker { <init>(...); }
+
+# The service and boot receiver are started by the system from the manifest.
+-keep class com.instagrum.local.notifications.GrowthService { *; }
+-keep class com.instagrum.local.notifications.BootReceiver { *; }

@@ -97,8 +97,9 @@ fun SettingsScreen(state: AppState, onAction: (Action) -> Unit, backup: BackupAc
                     "Activity while I'm away",
                     state.settings.backgroundActivity
                 ) { onAction(Action.SaveSettings(state.settings.copy(backgroundActivity = it))) }
+                ContinuousGrowthControls(state)
                 Text(
-                    "Optional background activity uses Android scheduling. Alerts may be delayed by battery settings; no always-on service runs.",
+                    "Periodic catch-up uses Android scheduling and may be delayed by battery settings. For second-by-second growth, keep the service above running.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -113,6 +114,53 @@ fun SettingsScreen(state: AppState, onAction: (Action) -> Unit, backup: BackupAc
             }
         }
     }
+}
+
+/**
+ * Continuous growth needs a foreground service, and Samsung's aggressive battery
+ * management will still stop it unless the app is exempted, so both controls
+ * live together.
+ */
+@Composable
+private fun ContinuousGrowthControls(state: AppState) {
+    val context = LocalContext.current
+    val preferences = remember { context.getSharedPreferences("growth_service", android.content.Context.MODE_PRIVATE) }
+    var running by remember { mutableStateOf(preferences.getBoolean("enabled", false)) }
+    val power = context.getSystemService(android.os.PowerManager::class.java)
+    var unrestricted by remember { mutableStateOf(power?.isIgnoringBatteryOptimizations(context.packageName) == true) }
+    ToggleSetting("Keep growing while closed", running) { enabled ->
+        running = enabled
+        preferences.edit().putBoolean("enabled", enabled).apply()
+        if (enabled) LocalNotifications.startContinuous(context) else LocalNotifications.stopContinuous(context)
+        unrestricted = power?.isIgnoringBatteryOptimizations(context.packageName) == true
+    }
+    if (running && !unrestricted) Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.errorContainer
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("Battery optimisation will stop this", fontWeight = FontWeight.SemiBold)
+            Text(
+                "Android may end the service within minutes. Allow unrestricted battery use to keep it running.",
+                style = MaterialTheme.typography.bodySmall
+            )
+            FilledTonalButton(onClick = {
+                runCatching {
+                    context.startActivity(
+                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                            .setData(android.net.Uri.parse("package:${context.packageName}"))
+                    )
+                }.onFailure {
+                    context.startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                }
+            }) { Text("Allow unrestricted battery") }
+        }
+    }
+    if (running) Text(
+        "A silent notification stays in your shade while this is on. Android requires it, and it is how the app is allowed to keep running.",
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant
+    )
 }
 
 /** Manual backup/restore/delete, provided by the Activity so previews and tests can omit it. */

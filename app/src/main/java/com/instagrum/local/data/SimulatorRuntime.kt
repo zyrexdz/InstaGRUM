@@ -148,6 +148,30 @@ class SimulatorRuntime private constructor(context: Context) {
         }
     }
 
+    /**
+     * Advances every account while the app is closed. Unlike [advanceBackground]
+     * this runs on a short loop from the foreground service, so growth is
+     * continuous rather than a periodic catch-up.
+     */
+    suspend fun advanceWhileClosed() {
+        load()
+        mutex.withLock {
+            if (mutableError.value != null) return@withLock
+            val active = mutableState.value ?: return@withLock
+            val now = System.currentTimeMillis()
+            if (!foreground && active.profileCreated && active.settings.backgroundActivity) {
+                val after = catchUp(active, now)
+                if (after != active) save(active, after)
+            }
+            for (snapshot in repository.allStates()) {
+                if (snapshot.activeAccountId == active.activeAccountId) continue
+                if (!snapshot.profileCreated || !snapshot.settings.backgroundActivity) continue
+                val after = catchUp(snapshot, now)
+                if (after != snapshot) repository.save(after)
+            }
+        }
+    }
+
     suspend fun advanceBackground() {
         load()
         mutex.withLock {

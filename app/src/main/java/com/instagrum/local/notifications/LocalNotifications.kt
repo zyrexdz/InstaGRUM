@@ -23,6 +23,9 @@ class LocalNotifications(private val context: Context) {
     companion object {
         const val CHANNEL = "local_social_activity";
         const val EXTRA_ACTIVITY = "activity_id"
+
+        fun startContinuous(context: Context) = GrowthService.start(context)
+        fun stopContinuous(context: Context) = GrowthService.stop(context)
     }
 
     private val preferences = context.getSharedPreferences("notification_delivery", Context.MODE_PRIVATE)
