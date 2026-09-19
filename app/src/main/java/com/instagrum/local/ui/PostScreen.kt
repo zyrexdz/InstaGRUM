@@ -37,35 +37,36 @@ import kotlinx.coroutines.flow.drop
 
 @Composable
 fun PostDetail(state: AppState, postId: String, onAction: (Action) -> Unit) {
-    val start = state.posts.indexOfFirst { it.id == postId }
-    if (start < 0) {
+    val start = state.posts.indexOfFirst { it.id == postId }.coerceAtLeast(0)
+    if (state.posts.isEmpty()) {
         LaunchedEffect(postId) { onAction(Action.OpenPost(null)) }; return
     }
-    val pagerState = rememberPagerState(initialPage = start) { state.posts.size }
-    val posts by rememberUpdatedState(state.posts)
-    LaunchedEffect(pagerState) {
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = start)
 
-        snapshotFlow { pagerState.currentPage }.distinctUntilChanged().drop(1)
-            .collect { page -> posts.getOrNull(page)?.let { onAction(Action.OpenPost(it.id)) } }
-    }
-    val current = state.posts.getOrNull(pagerState.currentPage) ?: state.posts[start]
     Scaffold(topBar = {
         ScreenHeader(
-            if (current.media.kind == MediaKind.REEL) "Reels" else "Posts",
-            { onAction(Action.OpenPost(null)) })
+            "Posts",
+            { onAction(Action.OpenPost(null)) }
+        )
     }) { padding ->
-        VerticalPager(
-            pagerState,
-            Modifier.fillMaxSize().padding(padding),
-            key = { state.posts[it].id }
-        ) { page ->
-            PostPage(state, state.posts[page], page == pagerState.currentPage, onAction)
+        LazyColumn(
+            state = listState,
+            modifier = Modifier.fillMaxSize().padding(padding),
+            contentPadding = PaddingValues(bottom = 36.dp)
+        ) {
+            itemsIndexed(state.posts, key = { _, post -> post.id }) { index, post ->
+                val isActive = index == listState.firstVisibleItemIndex || post.id == postId
+                PostItem(state, post, isActive, onAction)
+                Spacer(Modifier.height(16.dp))
+                HorizontalDivider(color = Color(0xFF1E1E1E), thickness = 0.8.dp)
+                Spacer(Modifier.height(6.dp))
+            }
         }
     }
 }
 
 @Composable
-private fun PostPage(state: AppState, post: Post, active: Boolean, onAction: (Action) -> Unit) {
+private fun PostItem(state: AppState, post: Post, active: Boolean, onAction: (Action) -> Unit) {
     var comments by rememberSaveable(post.id) { mutableStateOf(false) }
     var controls by rememberSaveable(post.id) { mutableStateOf(false) }
     var fullScreen by rememberSaveable(post.id) { mutableStateOf(false) }
@@ -80,101 +81,99 @@ private fun PostPage(state: AppState, post: Post, active: Boolean, onAction: (Ac
     }
     val like: () -> Unit =
         { onAction(Action.LikePost(post.id)); haptic.performHapticFeedback(HapticFeedbackType.LongPress) }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 20.dp)) {
-        item {
-            Row(
-                Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AvatarFromProfile(state.profile, Modifier.size(36.dp))
+            Spacer(Modifier.width(10.dp))
+            Column(Modifier.weight(1f)) {
+                Text(state.profile.username, fontWeight = FontWeight.SemiBold)
+                if (post.location.isNotBlank()) Text(post.location, style = MaterialTheme.typography.labelSmall)
+            }
+            IconButton(onClick = { controls = true }) { Icon(Icons.Default.MoreHoriz, "Post controls") }
+        }
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(if (post.media.kind == MediaKind.REEL) .7f else 1f)
+                .then(if (active) Modifier.testTag("postMedia") else Modifier)
+                .pointerInput(post.id) {
+                    detectTapGestures(onDoubleTap = {
+                        onAction(Action.LikePost(post.id, onlyLike = true)); heart++
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    })
+                }, contentAlignment = Alignment.Center
+        ) {
+            MediaContent(
+                post.media,
+                Modifier.fillMaxSize(),
+                playVideo = true,
+                paused = !active || comments || controls || fullScreen
+            )
+            androidx.compose.animation.AnimatedVisibility(
+                showHeart,
+                enter = scaleIn(spring(dampingRatio = .55f), initialScale = .4f) + fadeIn(),
+                exit = scaleOut(tween(160), targetScale = 1.2f) + fadeOut()
             ) {
-                AvatarFromProfile(state.profile, Modifier.size(36.dp))
-                Spacer(Modifier.width(10.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(state.profile.username, fontWeight = FontWeight.SemiBold)
-                    if (post.location.isNotBlank()) Text(post.location, style = MaterialTheme.typography.labelSmall)
-                }
-                IconButton(onClick = { controls = true }) { Icon(Icons.Default.MoreHoriz, "Post controls") }
+                Icon(Icons.Default.Favorite, "Liked", tint = Color.White, modifier = Modifier.size(96.dp))
             }
-            Box(
-                Modifier.fillMaxWidth().aspectRatio(if (post.media.kind == MediaKind.REEL) .7f else 1f)
-                    .then(if (active) Modifier.testTag("postMedia") else Modifier)
-                    .pointerInput(post.id) {
-                        detectTapGestures(onDoubleTap = {
-                            onAction(Action.LikePost(post.id, onlyLike = true)); heart++
-                            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        })
-                    }, contentAlignment = Alignment.Center
-            ) {
-                MediaContent(
-                    post.media,
-                    Modifier.fillMaxSize(),
-                    playVideo = true,
-                    paused = !active || comments || controls || fullScreen
+            IconButton(onClick = { fullScreen = true }, modifier = Modifier.align(Alignment.TopEnd)) {
+                Icon(
+                    Icons.Default.Fullscreen,
+                    "Open full-screen media",
+                    tint = Color.White
                 )
-                AnimatedVisibility(
-                    showHeart,
-                    enter = scaleIn(spring(dampingRatio = .55f), initialScale = .4f) + fadeIn(),
-                    exit = scaleOut(tween(160), targetScale = 1.2f) + fadeOut()
-                ) {
-                    Icon(Icons.Default.Favorite, "Liked", tint = Color.White, modifier = Modifier.size(96.dp))
-                }
-                IconButton(onClick = { fullScreen = true }, modifier = Modifier.align(Alignment.TopEnd)) {
-                    Icon(
-                        Icons.Default.Fullscreen,
-                        "Open full-screen media",
-                        tint = Color.White
-                    )
-                }
             }
-            Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "View insights",
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.clickable { insights = true }
+        }
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(
+                "View insights",
+                fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.clickable { insights = true }
+            )
+            HorizontalDivider(thickness = .5.dp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CountAction(
+                    if (post.liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                    "Like post",
+                    post.likes,
+                    if (post.liked) HeartColor else LocalContentColor.current,
+                    like
                 )
-                HorizontalDivider(thickness = .5.dp)
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CountAction(
-                        if (post.liked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        "Like post",
-                        post.likes,
-                        if (post.liked) HeartColor else LocalContentColor.current,
-                        like
-                    )
-                    Spacer(Modifier.width(18.dp))
-                    CountAction(
-                        Icons.Default.ChatBubbleOutline,
-                        "Open comments",
-                        post.commentCount,
-                        LocalContentColor.current
-                    ) { comments = true }
-                    Spacer(Modifier.width(18.dp))
-                    CountAction(
-                        Icons.Default.Repeat,
-                        "Shares",
-                        post.views / 400,
-                        LocalContentColor.current
-                    ) { insights = true }
-                    Spacer(Modifier.width(18.dp))
-                    Icon(
-                        Icons.AutoMirrored.Filled.Send,
-                        "Send post",
-                        Modifier.size(25.dp).clickable { insights = true })
-                    Spacer(Modifier.weight(1f))
-                    Icon(
-                        if (post.saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
-                        "Save post",
-                        Modifier.size(25.dp).clickable { onAction(Action.SavePost(post.id)) })
-                }
-                if (post.likes > 0) LikedByRow(post)
-                if (post.caption.isNotBlank()) Text("${state.profile.username}  ${post.caption}")
-                Text(
-                    formatDate(post.createdAt),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                if (state.engine.events.any { it.postId == post.id }) SmallPill("Your post is taking off ✨")
-                if (post.frozen) SmallPill("Statistics frozen")
+                Spacer(Modifier.width(18.dp))
+                CountAction(
+                    Icons.Default.ChatBubbleOutline,
+                    "Open comments",
+                    post.commentCount,
+                    LocalContentColor.current
+                ) { comments = true }
+                Spacer(Modifier.width(18.dp))
+                CountAction(
+                    Icons.Default.Repeat,
+                    "Shares",
+                    post.views / 400,
+                    LocalContentColor.current
+                ) { insights = true }
+                Spacer(Modifier.width(18.dp))
+                Icon(
+                    Icons.AutoMirrored.Filled.Send,
+                    "Send post",
+                    Modifier.size(25.dp).clickable { insights = true })
+                Spacer(Modifier.weight(1f))
+                Icon(
+                    if (post.saved) Icons.Default.Bookmark else Icons.Default.BookmarkBorder,
+                    "Save post",
+                    Modifier.size(25.dp).clickable { onAction(Action.SavePost(post.id)) })
             }
+            if (post.likes > 0) LikedByRow(post)
+            if (post.caption.isNotBlank()) Text("${state.profile.username}  ${post.caption}")
+            Text(
+                formatDate(post.createdAt),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (state.engine.events.any { it.postId == post.id }) SmallPill("Your post is taking off ✨")
+            if (post.frozen) SmallPill("Statistics frozen")
         }
     }
     if (comments) CommentsSheet(state, post, onAction) { comments = false }

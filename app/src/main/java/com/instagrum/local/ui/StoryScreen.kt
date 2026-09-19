@@ -496,8 +496,15 @@ fun StoryInsightsPanel(state: AppState, initialId: String, onAction: (Action) ->
         }
     }
 
+    val allStories = remember(state.stories, selectedId) {
+        state.stories.filter { it.expiresAt > System.currentTimeMillis() || it.id == selectedId }.ifEmpty { listOf(story) }
+    }
+
     Dialog(
-        onDismissRequest = onDismiss,
+        onDismissRequest = {
+            onAction(Action.OpenStory(selectedId))
+            onDismiss()
+        },
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         InstaTheme(true) {
@@ -523,7 +530,10 @@ fun StoryInsightsPanel(state: AppState, initialId: String, onAction: (Action) ->
                     )
                     Spacer(Modifier.weight(1f))
                     IconButton(
-                        onClick = onDismiss,
+                        onClick = {
+                            onAction(Action.OpenStory(selectedId))
+                            onDismiss()
+                        },
                         modifier = Modifier.size(36.dp)
                     ) {
                         Icon(
@@ -535,87 +545,104 @@ fun StoryInsightsPanel(state: AppState, initialId: String, onAction: (Action) ->
                     }
                 }
 
-                // Stories preview carousel with active card & adjacent camera card
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                // Stories preview carousel with all active cards & adjacent camera card
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.Bottom,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        // Active story card
-                        Box(
-                            Modifier
-                                .size(78.dp, 132.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color(0xFF181818))
+                    items(allStories, key = { it.id }) { item ->
+                        val isSelected = item.id == selectedId
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable { selectedId = item.id }
                         ) {
-                            MediaContent(story.media, Modifier.fillMaxSize())
-                            Row(
+                            Box(
                                 Modifier
-                                    .align(Alignment.BottomCenter)
-                                    .fillMaxWidth()
-                                    .background(
-                                        Brush.verticalGradient(
-                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
-                                        )
+                                    .size(78.dp, 132.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color(0xFF181818))
+                                    .border(
+                                        if (isSelected) 1.5.dp else 0.dp,
+                                        if (isSelected) Color.White.copy(alpha = 0.5f) else Color.Transparent,
+                                        RoundedCornerShape(8.dp)
                                     )
-                                    .padding(bottom = 6.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Icon(
-                                    Icons.Outlined.Group,
-                                    null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(13.dp)
-                                )
-                                Spacer(Modifier.width(4.dp))
-                                Text(
-                                    formatCount(viewerCount),
-                                    color = Color.White,
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
+                                MediaContent(item.media, Modifier.fillMaxSize())
+                                Row(
+                                    Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .background(
+                                            Brush.verticalGradient(
+                                                listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
+                                            )
+                                        )
+                                        .padding(bottom = 6.dp),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        Icons.Outlined.Group,
+                                        null,
+                                        tint = Color.White,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    val itemViews = item.views.coerceAtLeast(item.viewers.size.coerceAtLeast(1).toLong())
+                                    Text(
+                                        formatCount(itemViews),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
                             }
-                        }
 
-                        // Adjacent camera card
-                        Box(
-                            Modifier
-                                .size(54.dp, 96.dp)
-                                .clip(RoundedCornerShape(8.dp))
-                                .background(Color.Black)
-                                .border(1.dp, Color(0xFF262626), RoundedCornerShape(8.dp))
-                                .clickable {
-                                    onDismiss()
-                                    onAction(Action.Navigate("create"))
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                Icons.Outlined.PhotoCamera,
-                                contentDescription = "Add story",
-                                tint = Color.White,
-                                modifier = Modifier.size(24.dp)
-                            )
+                            // Inverted triangle caret under the active card
+                            if (isSelected) {
+                                Box(
+                                    Modifier.padding(top = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    DownwardCaret(
+                                        Modifier.size(12.dp, 7.dp),
+                                        color = Color(0xFF282828)
+                                    )
+                                }
+                            } else {
+                                Spacer(Modifier.height(11.dp))
+                            }
                         }
                     }
 
-                    // Inverted triangle caret pointing to the divider bar
-                    Box(
-                        Modifier
-                            .width(78.dp)
-                            .padding(top = 4.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        DownwardCaret(
-                            Modifier.size(12.dp, 7.dp),
-                            color = Color(0xFF282828)
-                        )
+                    item {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.clickable {
+                                onAction(Action.OpenStory(selectedId))
+                                onDismiss()
+                                onAction(Action.Navigate("create"))
+                            }
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(54.dp, 96.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.Black)
+                                    .border(1.dp, Color(0xFF262626), RoundedCornerShape(8.dp)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.PhotoCamera,
+                                    contentDescription = "Add story",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                            Spacer(Modifier.height(11.dp))
+                        }
                     }
                 }
 
