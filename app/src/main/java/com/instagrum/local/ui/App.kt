@@ -288,9 +288,9 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                                         "followers",
                                         Modifier.clickable { peopleSheet = "Followers" })
                                     ProfileStat(
-                                        profile.following,
-                                        "following",
-                                        Modifier.clickable { peopleSheet = "Following" })
+                                        state.posts.sumOf { it.likes },
+                                        "likes"
+                                    )
                                 }
                             }
                         }
