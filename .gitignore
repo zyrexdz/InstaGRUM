@@ -7,3 +7,4 @@ local.properties
 .tooling/
 *.jks
 *.keystore
+keystore.properties

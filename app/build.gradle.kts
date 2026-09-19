@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -19,14 +21,18 @@ android {
         vectorDrawables { useSupportLibrary = true }
     }
 
+    val keystore = rootProject.file("instagrum-release.jks")
+    val keystoreProperties = Properties().apply {
+        val file = rootProject.file("keystore.properties")
+        if (file.exists()) file.inputStream().use { load(it) }
+    }
+
     signingConfigs {
-        // A stable key means every future build is an in-place UPDATE, never a
-        // reinstall. Changing this key would force users to uninstall first.
-        create("release") {
-            storeFile = rootProject.file("instagrum-release.jks")
-            storePassword = "instagrum2024"
-            keyAlias = "instagrum"
-            keyPassword = "instagrum2024"
+        if (keystore.exists()) create("release") {
+            storeFile = keystore
+            storePassword = keystoreProperties.getProperty("storePassword", "instagrum2024")
+            keyAlias = keystoreProperties.getProperty("keyAlias", "instagrum")
+            keyPassword = keystoreProperties.getProperty("keyPassword", "instagrum2024")
         }
     }
 
@@ -34,16 +40,14 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
         }
         debug {
-            // Share the release key so a debug build can be replaced by a release
-            // build (and back) without losing saved accounts.
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
 
