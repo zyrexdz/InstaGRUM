@@ -18,10 +18,10 @@ Sampled from actual runs, not targets written into the code:
 
 | Followers | Post after 3 min (Viral) | Live peak (Natural) |
 |---:|---:|---:|
-| 1K | ~1.7K views | ~30 watching |
-| 100K | ~11K views | ~3.5K watching |
-| 1M | ~96K views | ~50K watching |
-| 10M | ~946K views, ~104K likes | ~300K watching |
+| 1K | ~1.7K views | ~25 watching |
+| 100K | ~11K views | ~2K watching |
+| 1M | ~96K views | ~18K watching |
+| 10M | ~946K views, ~104K likes | ~120K watching |
 
 ## Features
 
@@ -33,7 +33,7 @@ Sampled from actual runs, not targets written into the code:
 
 **Live**
 - Viewer count rises, dips and settles instead of climbing forever
-- Hype button pulls in a surge of viewers when you want a moment
+- Hype button pulls in a surge of viewers — tap again to turn it off and let the room settle back down
 - Chat scales with room size and reacts to your stream title
 - Gaining followers while streaming raises the room live
 

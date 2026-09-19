@@ -57,6 +57,7 @@ sealed interface Action {
     data object StopLive : Action
     data object LiveLike : Action
     data object LiveHype : Action
+    data object LiveDehype : Action
     data class LiveComment(val text: String) : Action
     data object ReadEvents : Action
     data object Refresh : Action

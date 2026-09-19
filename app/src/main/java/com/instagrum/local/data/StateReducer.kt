@@ -321,6 +321,9 @@ object StateReducer {
             Action.LiveHype -> s.copy(activeLive = s.activeLive?.let {
                 it.copy(hypeUntil = it.elapsedSeconds + 150.0)
             })
+            Action.LiveDehype -> s.copy(activeLive = s.activeLive?.let {
+                it.copy(hypeUntil = 0.0)
+            })
 
             is Action.LiveComment -> if (action.text.isBlank()) s else s.copy(activeLive = s.activeLive?.let {
                 it.copy(

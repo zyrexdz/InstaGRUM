@@ -302,7 +302,7 @@ fun formatCount(number: Long): String {
     val (divisor, suffix) = when {
         number >= 1_000_000_000 -> 1_000_000_000.0 to "B"
         number >= 1_000_000 -> 1_000_000.0 to "M"
-        number >= 10_000 -> 1_000.0 to "k"
+        number >= 1_000 -> 1_000.0 to "k"
         else -> return NumberFormat.getIntegerInstance(Locale.US).format(number)
     }
     return String.format(Locale.US, "%.1f", number / divisor).removeSuffix(".0") + suffix

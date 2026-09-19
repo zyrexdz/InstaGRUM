@@ -42,9 +42,11 @@ object LivestreamEngine {
         val pace = GrowthPresets.factor(settings.preset)
         val accountFollowerCount = accountFollowers.toDouble()
 
-        val followerCapacity = if (pace <= 0.0 || accountFollowerCount <= 0.0) 0.0 else accountFollowerCount * (
-                .012 + sqrt(pace) * .022
-                )
+        val followerCapacity = if (pace <= 0.0 || accountFollowerCount <= 0.0) 0.0 else {
+            val raw = accountFollowerCount * (.003 + sqrt(pace) * .005)
+            val dampened = raw / (1.0 + raw / 800_000.0)
+            dampened
+        }
         val discoveryBase = when (settings.preset) {
             GrowthPreset.DEAD -> 0.0
             GrowthPreset.VERY_SLOW -> .5
@@ -53,8 +55,8 @@ object LivestreamEngine {
             GrowthPreset.MEDIUM -> 8.0
             GrowthPreset.FAST -> 18.0
             GrowthPreset.VIRAL -> 45.0
-            GrowthPreset.EXTREME -> 120.0
-            GrowthPreset.CELEBRITY -> 400.0
+            GrowthPreset.EXTREME -> 90.0
+            GrowthPreset.CELEBRITY -> 200.0
         }
 
         val discoveryCapacity = discoveryBase * (1.0 + ln(accountFollowerCount + 1.0) * .35)
@@ -96,7 +98,7 @@ object LivestreamEngine {
         val ramp = if (elapsed < 4) 0.0 else (1 - exp(-(elapsed - 4) / 55))
         val lateFade = (1 - .6 * (elapsed / (c.durationMinutes * 60.0)).pow(3)).coerceAtLeast(.25)
         val hypeActive = s.hypeUntil > elapsed
-        val hype = if (hypeActive) 1 + 1.6 * sin(PI * ((s.hypeUntil - elapsed) / 150.0).coerceIn(0.0, 1.0)) else 1.0
+        val hype = if (hypeActive) 1 + 0.8 * sin(PI * ((s.hypeUntil - elapsed) / 150.0).coerceIn(0.0, 1.0)) else 1.0
         val capacity = c.maxViewers.coerceIn(0, 50_000_000)
             .coerceAtMost((naturalCapacity * hype).coerceIn(0.0, 50_000_000.0).roundToInt().coerceAtLeast(c.minViewers))
         val headroom = (capacity - s.viewers).coerceAtLeast(0)

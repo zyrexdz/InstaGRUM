@@ -644,7 +644,8 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                     )
                     }) { Icon(Icons.Default.FavoriteBorder, "Like livestream", tint = Color.White) }
                     HypeButton(live.hypeUntil > live.elapsedSeconds) {
-                        onAction(Action.LiveHype)
+                        if (live.hypeUntil > live.elapsedSeconds) onAction(Action.LiveDehype)
+                        else onAction(Action.LiveHype)
                         haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                     }
                 }
@@ -659,7 +660,7 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
     if (stats) ModalBottomSheet(onDismissRequest = { stats = false }) {
         Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Live insights", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            Text("${live.viewers} watching · ${live.peakViewers} peak")
+            Text("${formatCount(live.viewers.toLong())} watching · ${formatCount(live.peakViewers.toLong())} peak")
             Text("${formatCount(live.likes)} likes · ${formatCount(live.totalComments)} comments")
             Text("${formatCount(live.newFollowers)} new followers · ${formatDuration(live.elapsedSeconds)}")
         }
@@ -708,9 +709,9 @@ fun LiveHistory(state: AppState, onAction: (Action) -> Unit) {
                         "${formatTime(live.startedAt)} · ${formatDuration(live.elapsedSeconds)}",
                         style = MaterialTheme.typography.labelSmall
                     )
-                    Text("${live.peakViewers} peak viewers · ${formatCount(live.likes)} likes")
+                    Text("${formatCount(live.peakViewers.toLong())} peak viewers · ${formatCount(live.likes)} likes")
                     Text(
-                        "${live.totalComments} comments · ${live.newFollowers} new followers",
+                        "${formatCount(live.totalComments)} comments · ${formatCount(live.newFollowers)} new followers",
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
