@@ -133,9 +133,9 @@ fun AvatarFromProfile(profile: Profile, modifier: Modifier = Modifier.size(86.dp
 }
 
 @Composable
-fun AnimatedNumber(value: Long, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.TextUnit = 16.sp) {
+fun AnimatedNumber(value: Long, modifier: Modifier = Modifier, size: androidx.compose.ui.unit.TextUnit = 16.sp, uppercase: Boolean = false) {
     AnimatedContent(
-        formatCount(value),
+        formatCount(value, uppercase),
         transitionSpec = {
             (slideInVertically(Motion.enter()) { it / 2 } + fadeIn(Motion.quick()))
                 .togetherWith(slideOutVertically(Motion.quick()) { -it / 2 } + fadeOut(Motion.quick()))
@@ -148,9 +148,9 @@ fun AnimatedNumber(value: Long, modifier: Modifier = Modifier, size: androidx.co
 }
 
 @Composable
-fun Stat(label: String, value: Long, modifier: Modifier = Modifier) {
+fun Stat(label: String, value: Long, modifier: Modifier = Modifier, uppercase: Boolean = true) {
     Column(modifier.padding(vertical = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedNumber(value)
+        AnimatedNumber(value, uppercase = uppercase)
         Text(
             label,
             style = MaterialTheme.typography.labelMedium,
@@ -298,11 +298,11 @@ fun ConfirmAction(title: String, message: String, onConfirm: () -> Unit, onDismi
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } })
 }
 
-fun formatCount(number: Long): String {
+fun formatCount(number: Long, uppercase: Boolean = false): String {
     val (divisor, suffix) = when {
         number >= 1_000_000_000 -> 1_000_000_000.0 to "B"
         number >= 1_000_000 -> 1_000_000.0 to "M"
-        number >= 1_000 -> 1_000.0 to "k"
+        number >= 1_000 -> 1_000.0 to if (uppercase) "K" else "k"
         else -> return NumberFormat.getIntegerInstance(Locale.US).format(number)
     }
     return String.format(Locale.US, "%.1f", number / divisor).removeSuffix(".0") + suffix

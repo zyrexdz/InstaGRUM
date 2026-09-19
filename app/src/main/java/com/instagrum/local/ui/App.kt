@@ -120,7 +120,7 @@ private fun AccountSwitcher(state: AppState, onAction: (Action) -> Unit, dismiss
 @Composable
 private fun ProfileStat(value: Long, label: String, modifier: Modifier = Modifier) {
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedNumber(value, size = 15.sp)
+        AnimatedNumber(value, size = 15.sp, uppercase = true)
         Text(
             label,
             fontSize = 13.sp,
