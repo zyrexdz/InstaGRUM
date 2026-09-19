@@ -136,12 +136,12 @@ private fun ProfileStat(value: Long, label: String, modifier: Modifier = Modifie
 private fun ProfileButton(label: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
-        modifier = modifier.height(34.dp),
-        shape = RoundedCornerShape(10.dp),
+        modifier = modifier.height(32.dp),
+        shape = RoundedCornerShape(8.dp),
         color = MaterialTheme.colorScheme.surfaceVariant
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(label, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
@@ -299,25 +299,25 @@ private fun ProfileScreen(state: AppState, onAction: (Action) -> Unit) {
                             fontSize = 14.sp,
                             modifier = Modifier.padding(top = 12.dp)
                         )
-                        Spacer(Modifier.height(14.dp))
+                        Spacer(Modifier.height(12.dp))
                         Surface(
                             onClick = { onAction(Action.Navigate("settings")) },
                             shape = RoundedCornerShape(10.dp),
-                            color = MaterialTheme.colorScheme.surface,
+                            color = MaterialTheme.colorScheme.surfaceVariant,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Column(Modifier.padding(14.dp)) {
-                                Text("Your dashboard", fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                            Column(Modifier.padding(horizontal = 14.dp, vertical = 9.dp)) {
+                                Text("Your dashboard", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                                 Text(
                                     "${formatCount(state.posts.sumOf { it.views })} views in the last 30 days.",
-                                    fontSize = 13.sp,
+                                    fontSize = 12.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.padding(top = 2.dp)
                                 )
                             }
                         }
-                        Spacer(Modifier.height(10.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Spacer(Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                             ProfileButton("Edit profile", Modifier.weight(1f)) { editOpen = true }
                             ProfileButton("Share profile", Modifier.weight(1f)) { editOpen = true }
                         }
