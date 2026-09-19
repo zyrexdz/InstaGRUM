@@ -104,8 +104,8 @@ sdkmanager --licenses
 Make a file called `local.properties` in the project root:
 
 ```properties
-# Windows (note the escaped backslashes)
-sdk.dir=C\:\\Users\\YourName\\AppData\\Local\\Android\\Sdk
+# Windows
+sdk.dir=C:/Users/YourName/AppData/Local/Android/Sdk
 
 # macOS
 sdk.dir=/Users/YourName/Library/Android/sdk
@@ -113,6 +113,8 @@ sdk.dir=/Users/YourName/Library/Android/sdk
 # Linux
 sdk.dir=/home/YourName/Android/Sdk
 ```
+
+Use forward slashes on Windows too. Backslashes need escaping and it's easy to get wrong, which gives you a confusing `volume label syntax is incorrect` error.
 
 This file is gitignored because the path is different on every machine.
 
@@ -166,6 +168,8 @@ Both files are gitignored. **Keep the `.jks` somewhere safe** — lose it and yo
 **`Unsupported class file major version`** — you're on the wrong JDK. Set `JAVA_HOME` to 21.
 
 **`SDK location not found`** — missing `local.properties`, see step 3.
+
+**`volume label syntax is incorrect`** — your `sdk.dir` path is malformed. Use forward slashes.
 
 **`Permission denied` running gradlew** — `chmod +x gradlew`.
 
