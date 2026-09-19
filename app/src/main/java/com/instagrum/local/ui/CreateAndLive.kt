@@ -6,6 +6,7 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
 import androidx.compose.foundation.shape.CircleShape
@@ -458,6 +459,7 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
     var front by rememberSaveable { mutableStateOf(true) }
     var micOn by rememberSaveable { mutableStateOf(true) }
     var cameraOn by rememberSaveable { mutableStateOf(true) }
+    var liveZoom by rememberSaveable { mutableFloatStateOf(1f) }
     var heart by remember { mutableIntStateOf(0) }
     var visible by remember { mutableStateOf(false) }
     val chatState = rememberLazyListState()
@@ -472,9 +474,27 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
     }
     BackHandler { ending = true }
     InstaTheme(true) {
-        Box(Modifier.fillMaxSize().background(Color.Black)) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+                .pointerInput(cameraOn) {
+                    if (cameraOn) {
+                        detectTransformGestures { _, _, zoomFactor, _ ->
+                            liveZoom = (liveZoom * zoomFactor).coerceIn(1f, 8f)
+                        }
+                    }
+                }
+        ) {
             if (live.config.thumbnail.path.isNotBlank()) MediaContent(live.config.thumbnail, Modifier.fillMaxSize())
-            else if (cameraOn) CameraCapture(front, false, 0, {}, Modifier.fillMaxSize())
+            else if (cameraOn) CameraCapture(
+                front = front,
+                recording = false,
+                onCaptured = {},
+                modifier = Modifier.fillMaxSize(),
+                externalZoom = liveZoom,
+                onZoomChanged = { liveZoom = it }
+            )
             else Box(Modifier.fillMaxSize().background(Color(0xFF1A1A1A)), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.VideocamOff, null, Modifier.size(54.dp), tint = Color.White.copy(alpha = .35f))
             }
@@ -557,7 +577,7 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                     Column(
                         Modifier.padding(top = 18.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(22.dp)
+                        verticalArrangement = Arrangement.spacedBy(20.dp)
                     ) {
                         Icon(
                             if (micOn) Icons.Default.Mic else Icons.Default.MicOff,
@@ -577,6 +597,24 @@ fun LiveScreen(state: AppState, onAction: (Action) -> Unit) {
                             Modifier.size(26.dp).clickable(enabled = cameraOn) { front = !front },
                             tint = Color.White.copy(alpha = if (cameraOn) 1f else .3f)
                         )
+                        if (cameraOn) {
+                            Surface(
+                                onClick = { liveZoom = if (liveZoom < 1.85f) 2f else 1f },
+                                shape = CircleShape,
+                                color = Color.Black.copy(alpha = .45f),
+                                border = BorderStroke(1.dp, Color.White.copy(alpha = .35f)),
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text(
+                                        text = if (liveZoom in 1.9f..2.1f) "2x" else if (liveZoom < 1.15f) "1x" else String.format(java.util.Locale.US, "%.1fx", liveZoom),
+                                        color = Color.White,
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
                 Spacer(Modifier.weight(1f))

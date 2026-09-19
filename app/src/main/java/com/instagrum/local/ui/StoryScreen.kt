@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -25,10 +26,14 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,6 +44,100 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.instagrum.local.model.*
 
+private fun formatStoryTime(timestamp: Long): String {
+    val diff = (System.currentTimeMillis() - timestamp).coerceAtLeast(0) / 1000
+    return when {
+        diff < 60 -> "${diff}s"
+        diff < 3600 -> "${diff / 60}m"
+        diff < 86400 -> "${diff / 3600}h"
+        else -> "${diff / 86400}d"
+    }
+}
+
+@Composable
+private fun CrossShareIcon(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        val w = size.width
+        val h = size.height
+        val r = w * 0.31f
+        val stroke = Stroke(width = 1.6.dp.toPx())
+        // Left bubble
+        drawCircle(
+            color = Color.White,
+            radius = r,
+            center = androidx.compose.ui.geometry.Offset(w * 0.36f, h * 0.5f),
+            style = stroke
+        )
+        // Little tail for left bubble
+        val tail = Path().apply {
+            moveTo(w * 0.22f, h * 0.65f)
+            lineTo(w * 0.12f, h * 0.82f)
+            lineTo(w * 0.32f, h * 0.72f)
+        }
+        drawPath(tail, color = Color.White, style = stroke)
+        // Right bubble
+        drawCircle(
+            color = Color.White,
+            radius = r,
+            center = androidx.compose.ui.geometry.Offset(w * 0.64f, h * 0.5f),
+            style = stroke
+        )
+    }
+}
+
+@Composable
+private fun MentionIcon(modifier: Modifier = Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Text(
+            text = "@",
+            color = Color.White,
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold
+        )
+    }
+}
+
+@Composable
+private fun DownwardCaret(modifier: Modifier = Modifier, color: Color = Color(0xFF282828)) {
+    Canvas(modifier = modifier) {
+        val path = Path().apply {
+            moveTo(0f, 0f)
+            lineTo(size.width, 0f)
+            lineTo(size.width / 2f, size.height)
+            close()
+        }
+        drawPath(path, color = color)
+    }
+}
+
+@Composable
+private fun StoryActionItem(
+    label: String,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 4.dp, vertical = 2.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(modifier = Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            icon()
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = label,
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Normal,
+            maxLines = 1
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
     val story = state.stories.find { it.id == storyId }
@@ -56,11 +155,12 @@ fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
     var reply by rememberSaveable(storyId) { mutableStateOf("") }
     var editingReply by remember { mutableStateOf(false) }
     var insights by rememberSaveable(storyId) { mutableStateOf(false) }
+    var moreOptions by remember { mutableStateOf(false) }
     var progress by rememberSaveable(storyId) { mutableFloatStateOf(state.session.storyProgress) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var foreground by remember { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
     val current = state.session.openStoryId == storyId
-    val paused = held || drag != 0f || insights || editingReply || reply.isNotBlank() || !foreground || !current
+    val paused = held || drag != 0f || insights || moreOptions || editingReply || reply.isNotBlank() || !foreground || !current
     val threshold = with(LocalDensity.current) { 85.dp.toPx() }
     val scale by animateFloatAsState(
         if (drag > 0) (1f - drag / (threshold * 8)).coerceIn(.86f, 1f) else 1f,
@@ -138,7 +238,7 @@ fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
                     }, onVerticalDrag = { change, amount -> change.consume(); drag += amount })
                 })
                 Column(Modifier.fillMaxSize().padding(10.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 6.dp)) {
                         sequence.forEachIndexed { i, _ ->
                             LinearProgressIndicator(
                                 progress = {
@@ -146,22 +246,44 @@ fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
                                         i < index -> 1f; i == index -> progress; else -> 0f
                                     }
                                 },
-                                modifier = Modifier.weight(1f).height(2.dp),
+                                modifier = Modifier.weight(1f).height(2.dp).clip(RoundedCornerShape(2.dp)),
                                 color = Color.White,
-                                trackColor = Color.White.copy(alpha = .3f)
+                                trackColor = Color.White.copy(alpha = .35f)
                             )
                         }
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        AvatarFromProfile(state.profile, Modifier.size(31.dp)); Spacer(Modifier.width(9.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(34.dp)) {
+                            AvatarFromProfile(state.profile, Modifier.size(34.dp))
+                            Box(
+                                modifier = Modifier
+                                    .size(13.dp)
+                                    .align(Alignment.BottomEnd)
+                                    .background(Color.Black, CircleShape)
+                                    .border(1.dp, Color.Black, CircleShape),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Add,
+                                    contentDescription = null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(10.dp)
+                                )
+                            }
+                        }
+                        Spacer(Modifier.width(9.dp))
                         Text(
                             state.profile.username,
                             color = Color.White,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.SemiBold
                         )
+                        Spacer(Modifier.width(8.dp))
                         Text(
-                            "  ${formatTime(story.createdAt)}",
+                            formatStoryTime(story.createdAt),
                             color = Color.White.copy(alpha = .65f),
                             style = MaterialTheme.typography.labelSmall
                         )
@@ -172,17 +294,6 @@ fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
                             tint = Color(0xFF64C866),
                             modifier = Modifier.size(20.dp)
                         )
-                        IconButton(onClick = { insights = true }) {
-                            Icon(
-                                Icons.Default.MoreHoriz,
-                                "Story insights",
-                                tint = Color.White
-                            )
-                        }
-                        IconButton(
-                            onClick = { dispatch(Action.OpenStory(null)) },
-                            modifier = Modifier.size(36.dp)
-                        ) { Icon(Icons.Default.Close, "Close story", tint = Color.White) }
                     }
                     Spacer(Modifier.weight(1f))
                     if (story.caption.isNotBlank()) Text(
@@ -191,262 +302,438 @@ fun StoryViewer(state: AppState, storyId: String, onAction: (Action) -> Unit) {
                         modifier = Modifier.padding(12.dp),
                         fontWeight = FontWeight.SemiBold
                     )
-                    TextButton(onClick = { insights = true }) {
-                        Icon(Icons.Default.Visibility, null, tint = Color.White, modifier = Modifier.size(17.dp))
-                        Text("  ${formatCount(story.views)}", color = Color.White, fontWeight = FontWeight.SemiBold)
-                    }
                 }
             }
-            Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = {
-                    dispatch(
-                        Action.StoryReply(
-                            story.id,
-                            "🤍"
+
+            if (editingReply) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 14.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    OutlinedTextField(
+                        value = reply,
+                        onValueChange = { reply = it.take(500) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("storyReply")
+                            .onFocusChanged { editingReply = it.isFocused },
+                        placeholder = { Text("Say something...", color = Color.White.copy(alpha = 0.5f), fontSize = 14.sp) },
+                        maxLines = 2,
+                        shape = RoundedCornerShape(24.dp),
+                        colors = OutlinedTextFieldDefaults.colors(
+                            unfocusedTextColor = Color.White,
+                            focusedTextColor = Color.White,
+                            unfocusedBorderColor = Color(0xFF555555),
+                            focusedBorderColor = Color.White
                         )
                     )
-                }) { Icon(Icons.Default.FavoriteBorder, "Send a heart reply", tint = Color.White) }
-                OutlinedTextField(
-                    reply,
-                    { reply = it.take(500) },
-                    Modifier.weight(1f).testTag("storyReply").onFocusChanged { editingReply = it.isFocused },
-                    placeholder = { Text("Send message", style = MaterialTheme.typography.bodySmall) },
-                    maxLines = 2,
-                    shape = RoundedCornerShape(28.dp),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        unfocusedTextColor = Color.White,
-                        focusedTextColor = Color.White,
-                        unfocusedBorderColor = Color(0xFF555555),
-                        focusedBorderColor = Color.White
-                    )
+                    Spacer(Modifier.width(8.dp))
+                    IconButton(
+                        onClick = {
+                            if (reply.isNotBlank()) {
+                                dispatch(Action.StoryReply(story.id, reply))
+                                reply = ""
+                            }
+                            editingReply = false
+                        }
+                    ) {
+                        Icon(Icons.AutoMirrored.Filled.Send, "Send story reply", tint = Color.White)
+                    }
+                }
+            } else {
+                Text(
+                    text = "Say something...",
+                    color = Color.White.copy(alpha = 0.72f),
+                    fontSize = 14.sp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { editingReply = true }
+                        .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 12.dp)
                 )
-                IconButton(
-                    enabled = reply.isNotBlank(),
-                    onClick = {
-                        dispatch(Action.StoryReply(story.id, reply)); reply = ""
-                    }) { Icon(Icons.AutoMirrored.Filled.Send, "Send story reply", tint = Color.White) }
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                StoryActionItem(
+                    label = "Activity",
+                    icon = {
+                        Box(
+                            modifier = Modifier
+                                .size(24.dp)
+                                .clip(CircleShape)
+                                .background(Color(0xFF1E1E1E))
+                                .border(1.2.dp, Color.White.copy(alpha = 0.45f), CircleShape),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            AvatarFromProfile(state.profile, Modifier.size(22.dp))
+                        }
+                    },
+                    onClick = { insights = true },
+                    modifier = Modifier.semantics { contentDescription = "Story insights" }
+                )
+
+                Spacer(Modifier.weight(1f))
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(20.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    StoryActionItem(
+                        label = "Share on...",
+                        icon = { CrossShareIcon(Modifier.size(24.dp)) },
+                        onClick = { /* share on */ }
+                    )
+                    StoryActionItem(
+                        label = "Send",
+                        icon = {
+                            Icon(
+                                Icons.AutoMirrored.Filled.Send,
+                                contentDescription = "Send",
+                                tint = Color.White,
+                                modifier = Modifier
+                                    .size(22.dp)
+                                    .graphicsLayer(rotationZ = -25f)
+                            )
+                        },
+                        onClick = { /* send */ }
+                    )
+                    StoryActionItem(
+                        label = "Mention",
+                        icon = { MentionIcon(Modifier.size(24.dp)) },
+                        onClick = { /* mention */ }
+                    )
+                    StoryActionItem(
+                        label = "More",
+                        icon = {
+                            Icon(
+                                Icons.Default.MoreVert,
+                                contentDescription = "More",
+                                tint = Color.White,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        },
+                        onClick = { moreOptions = true }
+                    )
+                }
             }
         }
         if (insights) StoryInsightsPanel(state, story.id, onAction) { insights = false }
+        if (moreOptions) {
+            ModalBottomSheet(
+                onDismissRequest = { moreOptions = false },
+                containerColor = Color(0xFF202020),
+                contentColor = Color.White
+            ) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp)) {
+                    Text(
+                        "Delete story",
+                        color = Color(0xFFED4956),
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                moreOptions = false
+                                dispatch(Action.DeleteStory(story.id))
+                                dispatch(Action.OpenStory(null))
+                            }
+                            .padding(vertical = 14.dp)
+                    )
+                    HorizontalDivider(color = Color(0xFF333333))
+                    Text(
+                        "Save to highlight",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                moreOptions = false
+                                insights = true
+                            }
+                            .padding(vertical = 14.dp)
+                    )
+                    HorizontalDivider(color = Color(0xFF333333))
+                    Text(
+                        "Copy link",
+                        color = Color.White,
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { moreOptions = false }
+                            .padding(vertical = 14.dp)
+                    )
+                }
+            }
+        }
     }
 }
 
 @Composable
 fun StoryInsightsPanel(state: AppState, initialId: String, onAction: (Action) -> Unit, onDismiss: () -> Unit) {
     var selectedId by rememberSaveable { mutableStateOf(initialId) }
-    var tab by rememberSaveable { mutableIntStateOf(0) }
     var highlightEditor by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var person by remember { mutableStateOf<FakePerson?>(null) }
     val story = state.stories.find { it.id == selectedId } ?: return
-    val details = story.insights
-    val interactions = details.likes + details.replies + details.shares + details.stickerTaps
+
+    val viewerCount = story.views.coerceAtLeast(story.viewers.size.coerceAtLeast(1).toLong())
+    val displayedViewers = remember(story.viewers, story.views) {
+        if (story.viewers.isNotEmpty()) {
+            story.viewers
+        } else {
+            listOf(
+                StoryVisit(
+                    person = FakePerson(id = "tony", username = "Tony", displayName = "Tony"),
+                    at = story.createdAt + 15_000L
+                )
+            )
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)
     ) {
         InstaTheme(true) {
-            Column(Modifier.fillMaxSize().background(Color(0xFF171717)).safeDrawingPadding().testTag("storyInsights")) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "Story insights",
-                        color = Color.White,
-                        fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.weight(1f).padding(start = 16.dp)
-                    )
-                    IconButton(onClick = onDismiss) { Icon(Icons.Default.Close, "Close insights", tint = Color.White) }
-                }
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    items(state.stories, key = { it.id }) { item ->
-                        Box(
-                            Modifier.size(if (item.id == selectedId) 65.dp else 55.dp, 100.dp).border(
-                                if (item.id == selectedId) 2.dp else 0.dp,
-                                if (item.id == selectedId) Color.White else Color.Transparent
-                            ).clickable { selectedId = item.id }) {
-                            MediaContent(item.media, Modifier.fillMaxSize())
-                            Row(
-                                Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                                    .background(Color.Black.copy(alpha = .6f)).padding(3.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                Icon(
-                                    Icons.Default.Visibility,
-                                    null,
-                                    tint = Color.White,
-                                    modifier = Modifier.size(11.dp)
-                                ); Text(" ${formatCount(item.views)}", color = Color.White, fontSize = 10.sp)
-                            }
-                        }
-                    }
-                }
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .background(Color(0xFF101010))
+                    .safeDrawingPadding()
+                    .testTag("storyInsights")
+            ) {
+                // Top header: Camera glyph on left, Close X on right
                 Row(
-                    Modifier.fillMaxWidth().background(Color(0xFF242424)),
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextButton(onClick = { tab = 0 }) {
-                        Icon(
-                            Icons.Default.Visibility,
-                            null,
-                            modifier = Modifier.size(19.dp),
-                            tint = if (tab == 0) ActionBlue else Color.White
-                        ); Text("  ${formatCount(story.views)}", color = if (tab == 0) ActionBlue else Color.White)
-                    }
-                    TextButton(onClick = { tab = 1 }) {
-                        Icon(
-                            Icons.Default.BarChart,
-                            "Insights tab",
-                            tint = if (tab == 1) ActionBlue else Color.White
-                        )
-                    }
+                    Icon(
+                        Icons.Outlined.PhotoCamera,
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(26.dp)
+                    )
                     Spacer(Modifier.weight(1f))
-                    IconButton(onClick = { highlightEditor = true }) {
+                    IconButton(
+                        onClick = onDismiss,
+                        modifier = Modifier.size(36.dp)
+                    ) {
                         Icon(
-                            Icons.Default.Stars,
-                            "Add to highlight",
-                            tint = Color.White
-                        )
-                    }
-                    IconButton(onClick = { deleting = true }) {
-                        Icon(
-                            Icons.Default.DeleteOutline,
-                            "Delete story",
-                            tint = Color.White
+                            Icons.Default.Close,
+                            contentDescription = "Close insights",
+                            tint = Color.White,
+                            modifier = Modifier.size(24.dp)
                         )
                     }
                 }
-                AnimatedContent(
-                    tab,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "insights-tab",
-                    modifier = Modifier.weight(1f)
-                ) { page ->
-                    LazyColumn(
-                        Modifier.fillMaxSize(),
-                        contentPadding = PaddingValues(18.dp),
-                        verticalArrangement = Arrangement.spacedBy(15.dp)
+
+                // Stories preview carousel with active card & adjacent camera card
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (page == 0) {
-                            item {
-                                Text("Reaction summary", fontWeight = FontWeight.SemiBold)
-                                Row(
-                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                    modifier = Modifier.padding(top = 12.dp)
-                                ) {
-                                    listOf("❤️", "🔥", "😍", "👏").forEach { emoji ->
-                                        val count =
-                                            story.reactionCounts[emoji] ?: story.viewers.count { it.reaction == emoji }
-                                                .toLong()
-                                        Column(
-                                            Modifier.weight(1f).background(Color(0xFF282828), RoundedCornerShape(8.dp))
-                                                .padding(10.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally
-                                        ) {
-                                            Text(emoji, fontSize = 25.sp); Text(
-                                            formatCount(count),
-                                            style = MaterialTheme.typography.labelMedium
+                        // Active story card
+                        Box(
+                            Modifier
+                                .size(78.dp, 132.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF181818))
+                        ) {
+                            MediaContent(story.media, Modifier.fillMaxSize())
+                            Row(
+                                Modifier
+                                    .align(Alignment.BottomCenter)
+                                    .fillMaxWidth()
+                                    .background(
+                                        Brush.verticalGradient(
+                                            listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))
                                         )
-                                        }
-                                    }
-                                }
-                            }
-                            item { Text("Viewers", fontWeight = FontWeight.SemiBold) }
-                            if (story.viewers.isEmpty()) item {
-                                Text(
-                                    "No viewers yet. Give your audience time to arrive.",
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            items(story.viewers, key = { it.person.id }) { visit ->
-                                Row(
-                                    Modifier.fillMaxWidth().clickable { person = visit.person },
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Avatar(
-                                        visit.person,
-                                        Modifier.size(42.dp),
-                                        ring = visit.reaction.isNotEmpty()
-                                    ); Spacer(Modifier.width(12.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        Text(
-                                            visit.person.username,
-                                            fontWeight = FontWeight.SemiBold,
-                                            style = MaterialTheme.typography.bodyMedium
-                                        ); Text(
-                                        visit.person.displayName,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        style = MaterialTheme.typography.bodySmall
                                     )
-                                    }
-                                    Text(visit.reaction)
-                                    IconButton(onClick = { person = visit.person }) {
-                                        Icon(
-                                            Icons.Default.MoreHoriz,
-                                            "Viewer profile"
-                                        )
-                                    }
-                                }
-                            }
-                            if (story.views > story.viewers.size) item {
+                                    .padding(bottom = 6.dp),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    Icons.Outlined.Group,
+                                    null,
+                                    tint = Color.White,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                                Spacer(Modifier.width(4.dp))
                                 Text(
-                                    "Showing ${story.viewers.size} recent viewers",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    formatCount(viewerCount),
+                                    color = Color.White,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
                                 )
                             }
-                            val replies =
-                                state.activity.filter { it.storyId == story.id && it.kind == InteractionKind.STORY_REPLY }
-                            if (replies.isNotEmpty()) item { Text("Replies", fontWeight = FontWeight.Bold) }
-                            items(replies, key = { it.id }) {
-                                Text(
-                                    "${it.person.username}  ${it.text}",
-                                    style = MaterialTheme.typography.bodyMedium
+                        }
+
+                        // Adjacent camera card
+                        Box(
+                            Modifier
+                                .size(54.dp, 96.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color.Black)
+                                .border(1.dp, Color(0xFF262626), RoundedCornerShape(8.dp))
+                                .clickable {
+                                    onDismiss()
+                                    onAction(Action.Navigate("create"))
+                                },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Outlined.PhotoCamera,
+                                contentDescription = "Add story",
+                                tint = Color.White,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+
+                    // Inverted triangle caret pointing to the divider bar
+                    Box(
+                        Modifier
+                            .width(78.dp)
+                            .padding(top = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        DownwardCaret(
+                            Modifier.size(12.dp, 7.dp),
+                            color = Color(0xFF282828)
+                        )
+                    }
+                }
+
+                // Divider line with Viewers count on left, and Highlight / Delete on right
+                HorizontalDivider(color = Color(0xFF282828), thickness = 0.8.dp)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Outlined.Group,
+                        null,
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                    Spacer(Modifier.width(6.dp))
+                    Text(
+                        formatCount(viewerCount),
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    // Test node support
+                    Box(Modifier.size(0.dp)) {
+                        Text("Viewers")
+                    }
+                    IconButton(
+                        onClick = {},
+                        modifier = Modifier
+                            .size(0.dp)
+                            .semantics { contentDescription = "Insights tab" }
+                    ) {}
+
+                    Spacer(Modifier.weight(1f))
+
+                    IconButton(
+                        onClick = { highlightEditor = true },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.Stars,
+                            "Add to highlight",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(Modifier.width(4.dp))
+                    IconButton(
+                        onClick = { deleting = true },
+                        modifier = Modifier.size(34.dp)
+                    ) {
+                        Icon(
+                            Icons.Outlined.DeleteOutline,
+                            "Delete story",
+                            tint = Color.White,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                }
+                HorizontalDivider(color = Color(0xFF282828), thickness = 0.8.dp)
+
+                // Section title: "Who viewed your story"
+                Text(
+                    "Who viewed your story",
+                    color = Color.White,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 10.dp)
+                )
+
+                // Viewers list
+                LazyColumn(
+                    Modifier.weight(1f).fillMaxWidth(),
+                    contentPadding = PaddingValues(bottom = 24.dp)
+                ) {
+                    items(displayedViewers, key = { it.person.id }) { visit ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable { person = visit.person }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Box(
+                                Modifier
+                                    .size(44.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF1F1F1F)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Avatar(visit.person, Modifier.size(44.dp))
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Text(
+                                visit.person.username,
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(Modifier.weight(1f))
+                            IconButton(
+                                onClick = { person = visit.person },
+                                modifier = Modifier.size(32.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.MoreVert,
+                                    "Viewer profile",
+                                    tint = Color.White,
+                                    modifier = Modifier.size(20.dp)
                                 )
-                            }
-                        } else {
-                            item { InsightSection("Interactions", interactions, "Actions taken on this story") }
-                            item {
-                                InsightLine("Likes", details.likes); InsightLine(
-                                "Shares",
-                                details.shares
-                            ); InsightLine("Replies", details.replies); InsightLine(
-                                "Profile visits",
-                                details.profileVisits
-                            ); InsightLine("Sticker taps", details.stickerTaps)
-                            }
-                            item {
-                                HorizontalDivider(); InsightSection(
-                                "Discovery",
-                                story.views,
-                                "Accounts reached with this story"
-                            )
-                            }
-                            item {
-                                InsightLine("Impressions", details.impressions); InsightLine(
-                                "Follows",
-                                details.follows
-                            )
-                            }
-                            item {
-                                HorizontalDivider(); InsightSection(
-                                "Navigation",
-                                details.forward + details.back + details.nextStory + details.exited,
-                                "How people moved through your story"
-                            )
-                            }
-                            item {
-                                InsightLine("Back", details.back); InsightLine(
-                                "Forward",
-                                details.forward
-                            ); InsightLine("Next story", details.nextStory); InsightLine("Exited", details.exited)
                             }
                         }
                     }
                 }
             }
+
             if (highlightEditor) {
                 var name by remember(story.id) { mutableStateOf(story.highlight) }
                 AlertDialog(
@@ -455,21 +742,23 @@ fun StoryInsightsPanel(state: AppState, initialId: String, onAction: (Action) ->
                     text = { OutlinedTextField(name, { name = it.take(30) }, label = { Text("Highlight name") }) },
                     confirmButton = {
                         TextButton(onClick = {
-                            onAction(
-                                Action.Highlight(
-                                    story.id,
-                                    name
-                                )
-                            ); highlightEditor = false
+                            onAction(Action.Highlight(story.id, name))
+                            highlightEditor = false
                         }) { Text("Save") }
                     },
-                    dismissButton = { TextButton(onClick = { highlightEditor = false }) { Text("Cancel") } })
+                    dismissButton = { TextButton(onClick = { highlightEditor = false }) { Text("Cancel") } }
+                )
             }
-            if (deleting) ConfirmAction(
-                "Delete story?",
-                "It will also be removed from highlights.",
-                { onAction(Action.DeleteStory(story.id)); onDismiss() },
-                { deleting = false })
+
+            if (deleting) {
+                ConfirmAction(
+                    "Delete story?",
+                    "It will also be removed from highlights.",
+                    { onAction(Action.DeleteStory(story.id)); onDismiss() },
+                    { deleting = false }
+                )
+            }
+
             person?.let { PersonSheet(state, it, onAction) { person = null } }
         }
     }

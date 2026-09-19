@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.camera.core.Camera
 import androidx.camera.core.CameraSelector
 import androidx.camera.core.ImageCapture
 import androidx.camera.core.ImageCaptureException
@@ -20,15 +21,20 @@ import androidx.camera.video.VideoCapture
 import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.instagrum.local.model.Media
@@ -42,13 +48,15 @@ const val MAX_RECORDING_MILLIS = 60_000L
 @Composable
 fun CameraCapture(
     front: Boolean,
-    flash: Boolean,
-    captureRequest: Int,
-    onCaptured: (Media) -> Unit,
+    flash: Boolean = false,
+    captureRequest: Int = 0,
+    onCaptured: (Media) -> Unit = {},
     modifier: Modifier = Modifier,
     recording: Boolean = false,
     onRecordingFinished: (Media) -> Unit = {},
     onRecordingProgress: (Float) -> Unit = {},
+    externalZoom: Float = 1f,
+    onZoomChanged: ((Float) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val owner = LocalLifecycleOwner.current
@@ -71,10 +79,36 @@ fun CameraCapture(
     var capture by remember { mutableStateOf<ImageCapture?>(null) }
     var movie by remember { mutableStateOf<VideoCapture<Recorder>?>(null) }
     var session by remember { mutableStateOf<Recording?>(null) }
+    var cameraInstance by remember { mutableStateOf<Camera?>(null) }
+    var zoomRatio by remember { mutableFloatStateOf(1f) }
+    var minZoom by remember { mutableFloatStateOf(1f) }
+    var maxZoom by remember { mutableFloatStateOf(5f) }
     val callback by rememberUpdatedState(onCaptured)
     val recorded by rememberUpdatedState(onRecordingFinished)
     val progress by rememberUpdatedState(onRecordingProgress)
-    Box(modifier.background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
+
+    LaunchedEffect(externalZoom, cameraInstance) {
+        if (cameraInstance != null && externalZoom in minZoom..maxZoom && externalZoom != zoomRatio) {
+            zoomRatio = externalZoom
+            cameraInstance?.cameraControl?.setZoomRatio(externalZoom)
+        }
+    }
+
+    Box(
+        modifier
+            .background(Color(0xFF171717))
+            .pointerInput(cameraInstance) {
+                detectTransformGestures { _, _, zoomFactor, _ ->
+                    val target = (zoomRatio * zoomFactor).coerceIn(minZoom, maxZoom)
+                    if (target != zoomRatio) {
+                        zoomRatio = target
+                        cameraInstance?.cameraControl?.setZoomRatio(target)
+                        onZoomChanged?.invoke(target)
+                    }
+                }
+            },
+        contentAlignment = Alignment.Center
+    ) {
         if (permitted) {
             AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
             DisposableEffect(owner, front) {
@@ -99,11 +133,23 @@ fun CameraCapture(
                             if (front) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
                         provider!!.unbindAll()
 
-                        movie = try {
-                            provider!!.bindToLifecycle(owner, selector, preview, photo, video); video
+                        val cam = try {
+                            val c = provider!!.bindToLifecycle(owner, selector, preview, photo, video)
+                            movie = video
+                            c
                         } catch (_: Exception) {
                             provider!!.unbindAll()
-                            provider!!.bindToLifecycle(owner, selector, preview, photo); null
+                            val c = provider!!.bindToLifecycle(owner, selector, preview, photo)
+                            movie = null
+                            c
+                        }
+                        cameraInstance = cam
+                        cam.cameraInfo.zoomState.observe(owner) { state ->
+                            if (state != null) {
+                                minZoom = state.minZoomRatio
+                                maxZoom = state.maxZoomRatio.coerceAtMost(8f)
+                                zoomRatio = state.zoomRatio
+                            }
                         }
                         capture = photo; problem = null
                     } catch (_: Exception) {
@@ -112,7 +158,29 @@ fun CameraCapture(
                 }, ContextCompat.getMainExecutor(context))
                 onDispose {
                     disposed = true; session?.stop(); session = null
-                    provider?.unbindAll(); capture = null; movie = null
+                    provider?.unbindAll(); capture = null; movie = null; cameraInstance = null
+                }
+            }
+            if (maxZoom > 1.05f) {
+                Surface(
+                    onClick = {
+                        val nextZoom = if (zoomRatio < 1.85f) 2f.coerceAtMost(maxZoom) else 1f
+                        zoomRatio = nextZoom
+                        cameraInstance?.cameraControl?.setZoomRatio(nextZoom)
+                    },
+                    shape = CircleShape,
+                    color = Color.Black.copy(alpha = 0.55f),
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = if (recording) 85.dp else 24.dp)
+                ) {
+                    Text(
+                        text = if (zoomRatio in 1.9f..2.1f) "2x" else if (zoomRatio < 1.15f) "1x" else String.format(java.util.Locale.US, "%.1fx", zoomRatio),
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                    )
                 }
             }
         } else Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(36.dp)) {
